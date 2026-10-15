@@ -38,6 +38,11 @@ contextBridge.exposeInMainWorld('pulsar', {
   onUpdate: on('update'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   version: () => ipcRenderer.invoke('app:version'),
+  runStart: (id, rel) => ipcRenderer.invoke('run:start', { id, rel }),
+  runInput: (id, line) => ipcRenderer.invoke('run:input', { id, line }),
+  runKill: id => ipcRenderer.invoke('run:kill', id),
+  onRunOut: on('run:out'),
+  onRunExit: on('run:exit'),
   checkHtml: c => ipcRenderer.invoke('check:html', c),
   checkCode: (lang, code) => ipcRenderer.invoke('check:code', { lang, code })
 });

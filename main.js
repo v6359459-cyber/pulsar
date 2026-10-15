@@ -510,3 +510,33 @@ app.whenReady().then(() => {
 });
 ipcMain.handle('update:install', () => { if (autoUpdater) { stopServer(); autoUpdater.quitAndInstall(false, true); } });
 ipcMain.handle('app:version', () => app.getVersion());
+
+// ---------- interactive run: live output + keyboard input for programs with input() ----------
+const procs = {};
+ipcMain.handle('run:start', async (_e, { id, rel }) => {
+  const f = wsPath(rel); const ext = path.extname(f).toLowerCase();
+  if (!fs.existsSync(f)) throw new Error('file not found: ' + rel);
+  if (ext === '.html' || ext === '.htm') return { preview: pathToFileURL(f).href };
+  const list = runners(f); if (!list) throw new Error('cannot run ' + ext + ' files');
+  for (const [cmd, args, env] of list) {
+    const ok = await new Promise(res => {
+      let started = false, early = '';
+      const p = spawn(cmd, ext === '.py' ? [args[0] === '-3' ? '-3' : null, '-u', ...args.filter(a => a !== '-3')].filter(Boolean) : args,
+        { cwd: path.dirname(f), windowsHide: true, env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1', PYTHONUNBUFFERED: '1', ...(env || {}) } });
+      p.on('error', e => { if (!started) res(false); });
+      const out = d => { started = true; early += d; send('run:out', { id, data: String(d) }); };
+      p.stdout.on('data', out); p.stderr.on('data', out);
+      p.on('spawn', () => { procs[id] = p; setTimeout(() => res(true), 0); });
+      p.on('close', code => {
+        if (procs[id] === p) delete procs[id];
+        if (cmd === 'python' && code === 9009) { send('run:out', { id, data: '' }); }
+        send('run:exit', { id, code, missing: cmd === 'python' && code === 9009 });
+      });
+    });
+    if (ok) return { ok: true };
+  }
+  return { ok: false, noPython: ext === '.py' };
+});
+ipcMain.handle('run:input', (_e, { id, line }) => { const p = procs[id]; if (p && p.stdin.writable) p.stdin.write(line + '\n'); return !!p; });
+ipcMain.handle('run:kill', (_e, id) => { const p = procs[id]; if (p) { try { p.kill(); } catch {} delete procs[id]; } return true; });
+app.on('before-quit', () => { for (const p of Object.values(procs)) { try { p.kill(); } catch {} } });

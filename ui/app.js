@@ -141,7 +141,7 @@ async function appScreen() {
   root.innerHTML = `<div class="screen"><nav class="fu" id="nav"></nav>
     <div class="mid"><main id="main"></main>
       <div id="drawer" class="drawer"><div class="dhead"><span style="display:flex;align-items:center;gap:10px">${ico('play', 13)}<span>${T('output')}</span><span class="mono small muted" id="dtitle"></span><span id="dcode" class="mono small"></span></span>
-        <span><button class="ib sm" data-act="drerun" title="${T('run')}">${ico('reload', 14)}</button><button class="ib sm" data-act="dclose" aria-label="close">${ico('x', 14)}</button></span></div><pre id="out"></pre></div></div>
+        <span><button class="ib sm" data-act="drerun" title="${T('run')}">${ico('reload', 14)}</button><button class="ib sm" data-act="dclose" aria-label="close">${ico('x', 14)}</button></span></div><pre id="out"></pre><div class="runbar" id="runbar" style="display:none"><span class="mono small muted">›</span><input id="runin" placeholder="${T('runInputPh')}" autocomplete="off"><button class="ib sm" data-act="runSend" aria-label="send">${ico('fwd', 14)}</button></div></div></div>
     <aside id="panel" class="panel"><div class="bshell">
       <div class="btabs"><div id="btabs" class="btablist"></div><button class="ib sm" data-act="pclose" aria-label="close">${ico('x', 14)}</button></div>
       <div class="bbar"><button class="ib sm" data-act="wvBack" aria-label="back">${ico('back', 15)}</button><button class="ib sm" data-act="wvFwd" aria-label="forward">${ico('fwd', 15)}</button><button class="ib sm" data-act="wvReload" aria-label="reload">${ico('reload', 14)}</button>
@@ -575,6 +575,8 @@ async function execAction(a, repaint, auto) {
       if (/^(html?|py|js)$/.test(lang)) { const errs = await autoCheck({ lang: lang.startsWith('htm') ? 'html' : lang, code: a.body }, lang.startsWith('htm')); if (errs.length) { a.warn = errs.length; res += `\nPULSAR checked it and found problems — fix them and save the file again:\n- ${errs.join('\n- ')}`; } }
     }
     else if (a.kind === 'run') {
+      let src = ''; try { src = await P.ws.read(a.arg); } catch (e) {}
+      if (/\binput\s*\(|readline|prompt\(/.test(src)) { a.state = 'done'; repaint(); return `${a.arg} is interactive (asks for keyboard input). It was not run automatically; the user will press Run and play it. Do not remove input().`; }
       const r = await P.ws.run(a.arg);
       if (r.preview) { await browse(r.preview, true); res = `${a.arg} opened in the built-in browser.`; }
       else { a.out = r.noPython ? T('noPython') : (r.out || '').trim(); if (r.noPython) throw new Error(T('noPython')); res = `Ran ${a.arg}, exit code ${r.code}. Output:\n${(r.out || '').slice(-4000)}`; }
@@ -732,10 +734,32 @@ function showOut(title, text, code) {
   document.getElementById('out').textContent = (text || '').trim() || '—';
   d.classList.add('open');
 }
+// interactive run in the output panel: live output, typing goes to the program
+let runSeq = 0;
 async function runFile(rel, title) {
-  const r = await P.ws.run(rel).catch(err => ({ code: -1, out: String(err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '') }));
-  if (r.preview) { browse(r.preview, true); return; }
-  S.lastRun = rel; showOut(title || rel, r.noPython ? T('noPython') : r.out, r.code);
+  if (S.runId) P.runKill(S.runId);
+  const id = 'p' + (++runSeq); S.runId = id; S.lastRun = rel;
+  const d = document.getElementById('drawer'); const out = document.getElementById('out');
+  document.getElementById('dtitle').textContent = title || rel;
+  const dc = document.getElementById('dcode'); dc.textContent = '● ' + T('running'); dc.className = 'mono small';
+  out.textContent = ''; d.classList.add('open'); setRunInput(true);
+  const r = await P.runStart(id, rel).catch(err => ({ error: String(err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '') }));
+  if (r.preview) { d.classList.remove('open'); S.runId = null; browse(r.preview, true); return; }
+  if (r.error || !r.ok) { out.textContent = r.noPython ? T('noPython') : (r.error || 'error'); dc.textContent = '● -1'; dc.className = 'mono small err'; setRunInput(false); S.runId = null; }
+  else setTimeout(() => document.getElementById('runin')?.focus(), 100);
+}
+function setRunInput(on) { const w = document.getElementById('runbar'); if (w) w.style.display = on ? 'flex' : 'none'; }
+P.onRunOut(({ id, data }) => { if (id !== S.runId) return; const o = document.getElementById('out'); o.textContent += data; o.scrollTop = o.scrollHeight; });
+P.onRunExit(({ id, code, missing }) => {
+  if (id !== S.runId) return; S.runId = null; setRunInput(false);
+  const o = document.getElementById('out'); if (missing) o.textContent += '\n' + T('noPython');
+  const dc = document.getElementById('dcode'); dc.textContent = '● ' + code; dc.className = 'mono small ' + (code === 0 ? '' : 'err');
+});
+function sendRunInput() {
+  const i = document.getElementById('runin'); if (!i || !S.runId) return;
+  const line = i.value; i.value = '';
+  const o = document.getElementById('out'); o.textContent += line + '\n'; o.scrollTop = o.scrollHeight;
+  P.runInput(S.runId, line);
 }
 
 // --- conversation ---
@@ -1140,7 +1164,8 @@ root.addEventListener('click', async e => {
     case 'wvFwd': curTab()?.wv.goForward(); break;
     case 'wvReload': curTab()?.wv.reload(); break;
     case 'wvExt': { const t = curTab(); if (t && t.url !== START) P.openExternal(t.url); break; }
-    case 'dclose': document.getElementById('drawer').classList.remove('open'); break;
+    case 'dclose': document.getElementById('drawer').classList.remove('open'); if (S.runId) { P.runKill(S.runId); S.runId = null; } break;
+    case 'runSend': sendRunInput(); break;
     case 'drerun': if (S.lastRun) runFile(S.lastRun); break;
     case 'copy': navigator.clipboard.writeText(CODES[v].code); toast(T('copied')); break;
     case 'saveAs': { const c = CODES[v]; const ext = EXT[c.lang.toLowerCase()] || 'txt'; await P.ws.saveAs('file.' + ext, c.code); break; }
@@ -1153,6 +1178,7 @@ root.addEventListener('click', async e => {
   }
 });
 document.addEventListener('keydown', e => {
+  if (e.target.id === 'runin' && e.key === 'Enter') { e.preventDefault(); sendRunInput(); return; }
   if (e.target.id === 'addr' && e.key === 'Enter') {
     let u = e.target.value.trim(); if (!u) return;
     u = /^[a-z]+:\/\//i.test(u) ? u : /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(u) ? 'https://' + u : 'https://duckduckgo.com/?q=' + encodeURIComponent(u);

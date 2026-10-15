@@ -138,3 +138,6 @@ Object.assign(I18N.en, { chFixing: 'fixing, round', chLeft: n => `${n} issue(s) 
 
 Object.assign(I18N.ru, { updReady: v => `Новая версия ${v} готова`, updBtn: 'Перезапустить и обновить', updLoading: 'Скачиваю обновление' });
 Object.assign(I18N.en, { updReady: v => `Version ${v} is ready`, updBtn: 'Restart to update', updLoading: 'Downloading update' });
+
+Object.assign(I18N.ru, { running: 'работает', runInputPh: 'Ввод для программы — Enter, чтобы отправить' });
+Object.assign(I18N.en, { running: 'running', runInputPh: 'Input for the program — press Enter to send' });
