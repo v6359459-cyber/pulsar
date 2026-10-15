@@ -1,0 +1,21 @@
+name: Attach demo video
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag
+        required: true
+        default: v0.9.0
+
+permissions:
+  contents: write
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp docs/demo.mp4 PULSAR-demo.mp4 && gh release upload "${{ inputs.tag }}" PULSAR-demo.mp4 --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

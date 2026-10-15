@@ -24,3 +24,10 @@ jobs:
         run: npx electron-builder --win --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Attach demo video
+        shell: bash
+        run: |
+          V=$(node -p "require('./package.json').version")
+          cp docs/demo.mp4 PULSAR-demo.mp4 && gh release upload "v$V" PULSAR-demo.mp4 --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

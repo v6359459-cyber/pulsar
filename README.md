@@ -5,7 +5,7 @@
 **Free AI agents that run on your own PC.**
 No cloud, no account, no subscription — download a model and start building.
 
-[**Download for Windows**](https://github.com/v6359459-cyber/pulsar/releases/latest) · [Watch the demo (52 s)](docs/demo.mp4) · [Русский](#по-русски)
+[**Download for Windows**](https://github.com/v6359459-cyber/pulsar/releases/latest) · [Watch the demo with sound (52 s)](https://github.com/v6359459-cyber/pulsar/releases/download/v0.9.0/PULSAR-demo.mp4) · [Русский](#по-русски)
 
 <img src="docs/demo.gif" alt="PULSAR demo" width="880">
 
