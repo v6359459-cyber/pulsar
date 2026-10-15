@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PULSAR — local AI agents for your PC</title>
+<meta name="description" content="Free AI agents that run on your own PC. No cloud, no account.">
+<style>
+@font-face{font-family:Geist;src:url(geist.woff2) format('woff2');font-weight:100 900}
+*{box-sizing:border-box}
+html,body{margin:0;background:#000;color:#f5f5f5;font-family:Geist,system-ui,sans-serif;font-weight:300;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+header{display:flex;justify-content:space-between;align-items:center;padding:28px 0}
+.logo{font-size:13px;letter-spacing:.5em;font-weight:400}
+.logo i{display:inline-block;width:7px;height:7px;border-radius:4px;background:#fff;margin-right:12px;animation:led 1.4s ease-in-out infinite}
+nav a{color:#888;text-decoration:none;font-size:14px;margin-left:24px;transition:color .3s}nav a:hover{color:#fff}
+h1{font-size:clamp(52px,9vw,128px);font-weight:200;letter-spacing:-.045em;line-height:.95;margin:9vh 0 0;text-align:center}
+.sub{text-align:center;color:#888;font-size:clamp(17px,2vw,22px);margin:28px auto 40px;max-width:640px;line-height:1.5}
+.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;height:54px;padding:0 32px;border-radius:27px;background:#fff;color:#000;text-decoration:none;font-size:16px;font-weight:400;transition:transform .3s cubic-bezier(.2,.8,.2,1)}
+.btn:hover{transform:scale(1.04)}.btn.ghost{background:transparent;color:#fff;border:1px solid #333}
+.note{text-align:center;color:#555;font-size:13px;margin-top:16px}
+.video{margin:72px auto 0;border-radius:22px;overflow:hidden;border:1px solid #1f1f1f;box-shadow:0 60px 160px rgba(255,255,255,.06)}
+video{display:block;width:100%;height:auto;background:#000}
+.cap{text-align:center;color:#555;font-size:13px;margin:14px 0 0}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:120px 0}
+.card{border:1px solid #1a1a1a;border-radius:22px;padding:30px;background:#050505;transition:transform .5s cubic-bezier(.2,.8,.2,1),border-color .4s}
+.card:hover{transform:translateY(-4px);border-color:#333}
+.card b{display:block;font-size:20px;font-weight:400;margin-bottom:10px}.card p{color:#888;line-height:1.6;margin:0;font-size:15px}
+footer{display:flex;justify-content:space-between;color:#555;font-size:13px;padding:40px 0 60px;border-top:1px solid #111}
+footer a{color:#888;text-decoration:none}
+.r{opacity:0;transform:translateY(24px);filter:blur(6px);transition:opacity 1s cubic-bezier(.2,.8,.2,1),transform 1s cubic-bezier(.2,.8,.2,1),filter 1s}
+.r.in{opacity:1;transform:none;filter:none}
+@keyframes led{50%{opacity:.25}}
+@media(max-width:800px){.grid{grid-template-columns:1fr}nav a{margin-left:14px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><div class="logo"><i></i>PULSAR</div><nav><a href="https://github.com/v6359459-cyber/pulsar">GitHub</a><a href="https://github.com/v6359459-cyber/pulsar/releases/latest">Download</a></nav></header>
+  <h1 class="r">AI agents.<br>On your PC.</h1>
+  <p class="sub r">Free app that runs AI models locally. Agents write sites and programs, run them, fix their own errors and save files — only with your OK.</p>
+  <div class="cta r"><a class="btn" href="https://github.com/v6359459-cyber/pulsar/releases/latest">Download for Windows</a><a class="btn ghost" href="#demo">Watch demo</a></div>
+  <p class="note r">Windows 10/11 · free · no account</p>
+  <div class="video r" id="demo"><video src="demo.mp4" controls playsinline preload="metadata" poster="screenshot.png"></video></div>
+  <p class="cap">Demo is sped up. On a real PC a 9B model builds a site in a few minutes.</p>
+  <div class="grid">
+    <div class="card r"><b>Runs locally</b><p>Models run on your GPU or CPU. Chats and files never leave your computer.</p></div>
+    <div class="card r"><b>Tuned for your PC</b><p>PULSAR checks your hardware, recommends a model and sets everything up.</p></div>
+    <div class="card r"><b>Agents that act</b><p>Several agents in one request: study an example, build, run, fix, save.</p></div>
+  </div>
+  <footer><span>PULSAR · MIT license</span><a href="https://github.com/v6359459-cyber/pulsar">github.com/v6359459-cyber/pulsar</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
+document.querySelectorAll('.r').forEach((el,i)=>{el.style.transitionDelay=(i<5?i*.12:0)+'s';io.observe(el)});
+</script>
+</body>
+</html>
