@@ -1,0 +1,86 @@
+{
+  "name": "pulsar",
+  "version": "0.9.0",
+  "description": "PULSAR — free local AI agents for your PC",
+  "main": "main.js",
+  "keywords": [],
+  "author": "v6359459-cyber",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "extract-zip": "^2.0.1",
+    "resedit": "^2.0.3"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9",
+    "systeminformation": "^5.33.15"
+  },
+  "productName": "PULSAR",
+  "build": {
+    "appId": "app.pulsar.local",
+    "productName": "PULSAR",
+    "files": [
+      "main.js",
+      "preload.js",
+      "ui/**/*",
+      "build/icon.png",
+      "!node_modules/**/test/**"
+    ],
+    "afterPack": "build/after-pack.js",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "PULSAR",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "PULSAR-Setup-${version}.${ext}",
+      "language": "1049",
+      "multiLanguageInstaller": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "v6359459-cyber",
+        "repo": "pulsar",
+        "releaseType": "release"
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "engine",
+        "to": "engine"
+      }
+    ]
+  },
+  "scripts": {
+    "start": "electron .",
+    "engine": "node scripts/fetch-engine.js",
+    "build": "node scripts/fetch-engine.js && electron-builder --win",
+    "release": "node scripts/fetch-engine.js && electron-builder --win --publish always"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/v6359459-cyber/pulsar.git"
+  },
+  "homepage": "https://github.com/v6359459-cyber/pulsar"
+}

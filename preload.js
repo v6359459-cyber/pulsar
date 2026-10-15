@@ -1,0 +1,43 @@
+const { contextBridge, ipcRenderer } = require('electron');
+const on = ch => cb => { const f = (_e, d) => cb(d); ipcRenderer.on(ch, f); return () => ipcRenderer.removeListener(ch, f); };
+contextBridge.exposeInMainWorld('pulsar', {
+  getSettings: () => ipcRenderer.invoke('settings:get'),
+  setSettings: p => ipcRenderer.invoke('settings:set', p),
+  scan: () => ipcRenderer.invoke('hw:scan'),
+  download: m => ipcRenderer.invoke('model:download', m),
+  cancel: id => ipcRenderer.invoke('model:cancel', id),
+  localModels: () => ipcRenderer.invoke('model:local'),
+  deleteModel: id => ipcRenderer.invoke('model:delete', id),
+  openModels: () => ipcRenderer.invoke('open:models'),
+  start: o => ipcRenderer.invoke('engine:start', o),
+  stop: () => ipcRenderer.invoke('engine:stop'),
+  engineInfo: () => ipcRenderer.invoke('engine:info'),
+  ws: {
+    get: () => ipcRenderer.invoke('ws:get'), choose: () => ipcRenderer.invoke('ws:choose'), open: () => ipcRenderer.invoke('ws:open'),
+    openFile: r => ipcRenderer.invoke('ws:openFile', r), write: (rel, content) => ipcRenderer.invoke('ws:write', { rel, content }),
+    read: r => ipcRenderer.invoke('ws:read', r), list: r => ipcRenderer.invoke('ws:list', r), run: r => ipcRenderer.invoke('ws:run', r),
+    console: r => ipcRenderer.invoke('ws:console', r), saveAs: (name, content) => ipcRenderer.invoke('ws:saveAs', { name, content })
+  },
+  chat: (id, url, key, body) => ipcRenderer.send('chat:start', { id, url, key, body }),
+  chatAbort: id => ipcRenderer.send('chat:abort', id),
+  onChunk: on('chat:chunk'),
+  onChatEnd: on('chat:end'),
+  search: (q, key) => ipcRenderer.invoke('search', { q, key }),
+  webSearch: (q, key) => ipcRenderer.invoke('web:search', { q, key }),
+  openExternal: u => ipcRenderer.invoke('open:external', u),
+  onNewTab: on('wv:newtab'),
+  monitor: on_ => ipcRenderer.invoke('monitor:set', on_),
+  onProgress: on('model:progress'),
+  onEngine: on('engine:status'),
+  onLoad: on('monitor:load'),
+  onTemps: on('temps'),
+  partials: () => ipcRenderer.invoke('model:partial'),
+  chats: { list: () => ipcRenderer.invoke('chats:list'), get: id => ipcRenderer.invoke('chats:get', id), save: c => ipcRenderer.invoke('chats:save', c), del: id => ipcRenderer.invoke('chats:delete', id) },
+  log: l => ipcRenderer.send('log', l),
+  report: x => ipcRenderer.invoke('report:make', x),
+  onUpdate: on('update'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  version: () => ipcRenderer.invoke('app:version'),
+  checkHtml: c => ipcRenderer.invoke('check:html', c),
+  checkCode: (lang, code) => ipcRenderer.invoke('check:code', { lang, code })
+});
