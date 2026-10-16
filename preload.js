@@ -15,7 +15,7 @@ contextBridge.exposeInMainWorld('pulsar', {
   ws: {
     get: () => ipcRenderer.invoke('ws:get'), choose: () => ipcRenderer.invoke('ws:choose'), open: () => ipcRenderer.invoke('ws:open'),
     openFile: r => ipcRenderer.invoke('ws:openFile', r), write: (rel, content) => ipcRenderer.invoke('ws:write', { rel, content }),
-    read: r => ipcRenderer.invoke('ws:read', r), list: r => ipcRenderer.invoke('ws:list', r), run: r => ipcRenderer.invoke('ws:run', r),
+    read: r => ipcRenderer.invoke('ws:read', r), list: r => ipcRenderer.invoke('ws:list', r), move: (from, to) => ipcRenderer.invoke('ws:move', { from, to }), mkdir: r => ipcRenderer.invoke('ws:mkdir', r), run: r => ipcRenderer.invoke('ws:run', r),
     console: r => ipcRenderer.invoke('ws:console', r), saveAs: (name, content) => ipcRenderer.invoke('ws:saveAs', { name, content })
   },
   chat: (id, url, key, body) => ipcRenderer.send('chat:start', { id, url, key, body }),

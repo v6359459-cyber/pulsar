@@ -99,8 +99,8 @@ button.card{cursor:pointer;font-size:inherit}
 webview{flex:1;background:#fff}
 #out{flex:1;margin:0;padding:16px;overflow:auto;font-family:'Geist Mono',monospace;font-size:12px;color:#ccc;white-space:pre-wrap;user-select:text}
 .status{display:inline-flex;align-items:center;gap:10px;margin-top:12px;font-size:14px}
-.shimmer{background:linear-gradient(90deg,#555 0%,#fff 45%,#555 90%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shim 1.8s linear infinite}
-@keyframes shim{0%{background-position:120% 0}100%{background-position:-120% 0}}
+.shimmer{color:#fff;animation:shim 1.6s ease-in-out infinite;will-change:opacity}
+@keyframes shim{0%,100%{opacity:.4}50%{opacity:1}}
 .codebox{border:1px solid #1f1f1f;border-radius:14px;overflow:hidden;margin:10px 0;background:#0b0b0b;white-space:normal}
 .codehead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px 6px 14px;border-bottom:1px solid #1a1a1a;font-family:'Geist Mono',monospace;font-size:12px;color:#888}
 .msg .codebox pre{margin:0;border:none;border-radius:0;max-height:420px;overflow:auto}
@@ -178,10 +178,10 @@ select.pick{height:34px;border-radius:17px;border:1px solid #222;background:#050
 .chat>.row .chips:first-child{overflow:hidden}
 .chain{display:flex;flex-direction:column;gap:12px;padding:16px 18px;border:1px solid #1a1a1a;border-radius:16px;background:#050505;white-space:normal}
 .csteps{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
-.cstep{font-size:12px;padding:5px 11px;border-radius:12px;border:1px solid #222;color:#555;transition:all .4s cubic-bezier(.2,.8,.2,1)}
+.cstep{font-size:12px;padding:5px 11px;border-radius:12px;border:1px solid #222;color:#555;transition:color .35s ease,background-color .35s ease,border-color .35s ease;backface-visibility:hidden;contain:layout paint}
 .cstep.done{color:#000;background:#fff;border-color:#fff}
 .cstep.work{color:#fff;border-color:#555}
-.cline{width:14px;height:1px;background:#222;transition:background .4s}.cline.done{background:#fff}
+.cline{width:14px;height:1px;background:#222;transform-origin:left center;transition:background-color .35s ease}.cline.done{background:#fff}
 .cnow{display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc}
 .hist{flex:1;min-height:0;overflow-y:auto;margin:18px -4px 8px;display:flex;flex-direction:column;gap:2px}
 .histh{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#555;padding:0 16px 8px}
@@ -249,14 +249,13 @@ main.swap>*{animation:viewIn .5s cubic-bezier(.2,.8,.2,1) both}
 .nav:active{transform:scale(.97)}
 .nav.on{animation:navOn .4s cubic-bezier(.2,.9,.25,1.1)}
 @keyframes navOn{0%{transform:scale(.96)}100%{transform:none}}
-.cstep{transition:all .5s cubic-bezier(.2,.9,.25,1.1)}
 .cstep.done{animation:stepDone .5s cubic-bezier(.2,.9,.25,1.2)}
-@keyframes stepDone{0%{transform:scale(.85)}60%{transform:scale(1.06)}100%{transform:none}}
+@keyframes stepDone{0%{transform:scale(.94)}100%{transform:none}}
 .cline{position:relative;overflow:hidden}.cline.done{background:#fff;animation:lineFill .5s cubic-bezier(.4,0,.2,1)}
-@keyframes lineFill{0%{transform:scaleX(0);transform-origin:left}100%{transform:scaleX(1)}}
+@keyframes lineFill{0%{transform:scaleX(0)}100%{transform:scaleX(1)}}
 .panel.open .bshell{animation:shellIn .6s .1s cubic-bezier(.2,.8,.2,1) both}
 @keyframes shellIn{0%{opacity:0;transform:translateX(16px)}100%{opacity:1;transform:none}}
-.card,.btn,.chip,.ibtn,.cb{will-change:transform}
+
 .hitem{transition:background .25s,color .25s,padding .25s}.hitem:hover{padding-left:20px}
 @media (prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 .memnote{display:inline-flex;align-items:center;gap:8px;margin-top:12px;padding:6px 12px;border:1px solid #222;border-radius:14px;font-size:12px;color:#888;animation:permIn .5s cubic-bezier(.2,.9,.25,1.1) both}
@@ -266,3 +265,7 @@ main.swap>*{animation:viewIn .5s cubic-bezier(.2,.8,.2,1) both}
 .updt{font-size:22px;font-weight:300;text-align:center}
 .updsub{font-size:12px;color:#777;text-align:center;min-height:16px}
 .hwbox.upd{text-align:center}
+
+.chain{contain:layout style}.cnow{min-height:18px;display:flex;align-items:center;gap:8px}.cnow .dot{flex:none}.cnow .dot.off{display:none}
+.msg.stopped{color:#777;font-size:14px;display:flex;align-items:center;gap:8px}.msg.stopped::before{content:'';width:6px;height:6px;border-radius:3px;background:#555}
+.msgs{overflow-anchor:none}

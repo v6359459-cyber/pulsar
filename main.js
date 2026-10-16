@@ -277,6 +277,13 @@ ipcMain.handle('ws:openFile', (_e, rel) => shell.openPath(wsPath(rel)));
 ipcMain.handle('ws:write', (_e, { rel, content }) => {
   const p = wsPath(rel); fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, content, 'utf8'); return p;
 });
+ipcMain.handle('ws:move', (_e, { from, to }) => {
+  const a = wsPath(from), b = wsPath(to);
+  if (!fs.existsSync(a)) throw new Error('not found: ' + from);
+  if (fs.existsSync(b)) throw new Error('already exists: ' + to);
+  fs.mkdirSync(path.dirname(b), { recursive: true }); fs.renameSync(a, b); return true;
+});
+ipcMain.handle('ws:mkdir', (_e, rel) => { fs.mkdirSync(wsPath(rel), { recursive: true }); return true; });
 ipcMain.handle('ws:read', (_e, rel) => {
   const p = wsPath(rel); const st = fs.statSync(p);
   if (st.size > 200000) throw new Error('file too large');
@@ -416,16 +423,23 @@ app.whenReady().then(startTemps);
 // ---------- chat history ----------
 const CHATS = () => { const d = path.join(DATA(), 'chats'); fs.mkdirSync(d, { recursive: true }); return d; };
 const chatFile = id => path.join(CHATS(), String(id).replace(/[^\w-]/g, '') + '.json');
+// list reads only the head of each file: id, title and updated are written first
+function chatHead(f) {
+  const fd = fs.openSync(f, 'r'); const buf = Buffer.alloc(600); const n = fs.readSync(fd, buf, 0, 600, 0); fs.closeSync(fd);
+  const h = buf.toString('utf8', 0, n), m = h.match(/^\{"updated":(\d+),"id":("(?:[^"\\]|\\.)*"),"title":("(?:[^"\\]|\\.)*")/);
+  if (m) return { updated: +m[1], id: JSON.parse(m[2]), title: JSON.parse(m[3]) };
+  const c = JSON.parse(fs.readFileSync(f, 'utf8')); return { id: c.id, title: c.title, updated: c.updated };
+}
 ipcMain.handle('chats:list', () => {
   const out = [];
   for (const f of fs.readdirSync(CHATS())) {
     if (!f.endsWith('.json')) continue;
-    try { const c = JSON.parse(fs.readFileSync(path.join(CHATS(), f), 'utf8')); out.push({ id: c.id, title: c.title, updated: c.updated }); } catch {}
+    try { out.push(chatHead(path.join(CHATS(), f))); } catch {}
   }
   return out.sort((a, b) => b.updated - a.updated).slice(0, 200);
 });
 ipcMain.handle('chats:get', (_e, id) => { try { return JSON.parse(fs.readFileSync(chatFile(id), 'utf8')); } catch { return null; } });
-ipcMain.handle('chats:save', (_e, c) => { fs.writeFileSync(chatFile(c.id), JSON.stringify({ ...c, updated: Date.now() })); return true; });
+ipcMain.handle('chats:save', (_e, c) => { fs.writeFileSync(chatFile(c.id), JSON.stringify({ updated: Date.now(), id: c.id, title: c.title, ...c })); return true; });
 ipcMain.handle('chats:delete', (_e, id) => { try { fs.unlinkSync(chatFile(id)); } catch {} return true; });
 
 // ---------- error report ----------

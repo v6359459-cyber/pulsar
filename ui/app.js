@@ -52,6 +52,8 @@ const DRAFT_RULES = [
   [/granite[\s_.-]*4/i, 'draft-granite']
 ];
 const NO_DRAFT = new Set(['gemma4-e4b', 'lfm25-8b-a1b', 'gpt-oss-20b', 'phi35-mini']);
+// accelerator for this model if boosters are on and this one is not switched off
+function draftOn(m) { if (S.st.spec === false) return null; const id = draftFor(m); return id && !(S.st.draftOff || {})[id] ? DRAFTS.find(x => x.id === id) : null; }
 function draftFor(m) {
   if (!m || NO_DRAFT.has(m.id) || String(m.id).startsWith('draft-')) return null;
   const key = `${m.id} ${m.name} ${m.path ? m.path.split(/[\\/]/).pop() : ''}`;
@@ -61,12 +63,12 @@ function draftFor(m) {
 }
 const findM = id => allModels().find(x => x.id === id) || DRAFTS.find(x => x.id === id);
 function helperCard(d, i) {
-  const dl = S.dl[d.id], have = S.local.has(d.id), on = S.st.spec !== false;
+  const dl = S.dl[d.id], have = S.local.has(d.id), on = S.st.spec !== false && !(S.st.draftOff || {})[d.id];
   const helps = allModels().filter(m => draftFor(m) === d.id).map(m => m.name).join(', ');
   let actions;
   if (dl) actions = `<div class="track"><div id="pg-${d.id}" style="width:${dl.total ? (dl.got / dl.total * 100).toFixed(1) : 0}%"></div></div>
     <div class="row small muted"><span class="mono" id="pt-${d.id}">${dlText(dl, d)}</span><button class="btn ghost sm" data-act="cancel" data-v="${d.id}">${T('cancel')}</button></div>`;
-  else if (have) actions = `<div class="row"><button class="btn sm ${on ? '' : 'ghost'}" style="flex:1" data-act="specTgl">${on ? T('helperOn') : T('helperOff')}</button><button class="btn ghost sm" data-act="del" data-v="${d.id}">${T('del')}</button></div>`;
+  else if (have) actions = `<div class="row"><button class="btn sm ${on ? '' : 'ghost'}" style="flex:1" data-act="draftTgl" data-v="${d.id}">${on ? T('helperOn') : T('helperOff')}</button><button class="btn ghost sm" data-act="del" data-v="${d.id}">${T('del')}</button></div>`;
   else actions = `<button class="btn ghost sm" data-act="dlHelper" data-v="${d.id}">${S.partial[d.id] ? T('resumeDl') : T('download')}</button>`;
   return `<div class="card fu helper" style="animation-delay:${.14 + i * .04}s">
     <div class="row"><span class="fit fit2">${T('helperTag')}</span><span class="mono small muted">≈${d.size} ${T('gb')}</span></div>
@@ -91,7 +93,8 @@ function plan(m) {
   const o = S.st.opt || {};
   const auto = o.auto !== false;
   const vram = S.st.engine === 'cpu' ? 0 : hw.vramGB || 0, ram = hw.ramGB || 8;
-  const budget = vram - 1.5;
+  const dOn = draftOn(m), reserve = dOn ? dOn.size + 0.4 : 0;
+  const budget0 = vram - 1.5, draftRoom = !!dOn && m.size <= budget0 - reserve, budget = draftRoom ? budget0 - reserve : budget0;
   let ngl = 0, fit, ctx = 4096, speed, cpuMoe = false;
   if (vram >= 2 && m.size <= budget) {
     ngl = 999; fit = 2; speed = Math.round(150 / m.size);
@@ -119,7 +122,7 @@ function plan(m) {
     for (const n of [4, 3, 2]) { if (vram >= n * 4 && free * 0.9 / per / n >= 8192) { slots = n; break; } }
     if (slots > 1) ctx = Math.max(8192, Math.min(ctx, Math.floor(free * 0.9 / per / slots / 1024) * 1024));
   }
-  return { ngl, fit, ctx, threads, slots, cpuMoe, speed: measured || speed, measured: !!measured, gpu: ngl > 0 };
+  return { ngl, fit, ctx, threads, slots, cpuMoe, speed: measured || speed, measured: !!measured, gpu: ngl > 0, draftRoom: draftRoom && ngl === 999 && !cpuMoe };
 }
 function planText(m, p) {
   const gpuPart = p.cpuMoe ? `${T('onGpu')} + ${T('inRam')}` : p.ngl === 999 ? `${m.layers}/${m.layers} ${T('onGpu')}` : p.ngl > 0 ? `${p.ngl}/${m.layers} ${T('onGpu')}, ${T('inRam')}` : T('onCpu');
@@ -158,7 +161,9 @@ function intro() {
 async function afterIntro() {
   clearTimeout(introTimer); Sound.stopAll();
   if (S._afterIntro) return; S._afterIntro = true;
-  await updateStep();
+  if (!S.st.introSeen) save({ introSeen: true });
+  // updates download in the background; the app opens at once
+  P.checkUpdate().catch(() => {});
   if (!S.st.hw) scanScreen(); else appScreen();
   if (S.st.justUpdated) { const v = S.st.justUpdated; await save({ justUpdated: null }); setTimeout(() => toast(T('updDone')(v)), 900); }
 }
@@ -333,14 +338,15 @@ async function startModel(id) {
   const m = allModels().find(x => x.id === id); const p = plan(m);
   S.running = null; S.engine = { stage: 'load' };
   if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = engineText(); }
-  const dr = draftFor(m), canDraft = dr && S.st.spec !== false && p.ngl >= (m.layers || 32) && !p.cpuMoe, useDraft = canDraft && S.local.has(dr);
+  const dd = draftOn(m), dr = dd && dd.id, canDraft = !!dr && p.draftRoom, useDraft = canDraft && S.local.has(dr);
   if (canDraft && !S.local.has(dr) && !S.dl[dr]) autoDraft(id, dr);
   const r = await P.start({ id, path: m.path, ngl: p.ngl, ctx: p.ctx, threads: p.threads, gpu: p.ngl > 0, layers: m.layers, slots: p.slots, cpuMoe: p.cpuMoe, draft: useDraft ? dr : null });
   if (!r.ok) { S.engine = { stage: 'error', error: r.error }; toast(T('eError') + ': ' + (r.error || '').slice(0, 300)); if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = engineText(); } return false; }
-  S.running = id; S.slots = r.slots || 1; S.engine = { stage: 'ready', kind: r.kind }; S.spec = !!r.spec; if (r.spec) toast(T('specOn')); if (!S.sel || S.sel === 'local') S.sel = 'local';
+  S.running = id; S.slots = r.slots || 1; S.engine = { stage: 'ready', kind: r.kind }; S.spec = !!r.spec; if (!S.sel || S.sel === 'local') S.sel = 'local';
   renderNav(); if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = ''; const mp = $('#mpill'); if (mp) mp.textContent = m.name; } else renderMain();
   Sound.done();
-  if (!(S.st.speed && S.st.speed[id])) measureSpeed(id);
+  const sk = id + (r.spec ? '+spec' : '');
+  if (!(S.st.speed && S.st.speed[sk])) measureSpeed(id, r.spec); else showSpeed();
   return true;
 }
 // auto model choice: picks the best downloaded model for the task
@@ -355,12 +361,19 @@ function pickModel(kind) {
   const score = x => (x.m.tags.includes(kind) ? 100 : x.m.tags.includes('general') ? 20 : 0) + x.p.fit * 10 + Math.min(x.p.speed, 60) / 6 + x.m.size;
   return c.sort((a, b) => score(b) - score(a))[0].m;
 }
-async function measureSpeed(id) {
+function speedText() {
+  if (!S.running) return '';
+  const sp = S.st.speed || {}, base = sp[S.running], fast = sp[S.running + '+spec'];
+  if (S.spec) return fast ? `${fast} ${T('tps')} · ${T('withBoost')}${base ? ` · ${T('noBoost')} ${base}` : ''}` : T('withBoost');
+  return base ? `${base} ${T('tps')}` : '';
+}
+function showSpeed() { const el = $('#spill'); if (el) { el.textContent = speedText(); el.style.display = el.textContent ? '' : 'none'; } }
+async function measureSpeed(id, spec) {
   try {
     const r = await fetch('http://127.0.0.1:18089/completion', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt: 'Write a short paragraph about the sea.', n_predict: 64, cache_prompt: false }) });
     const j = await r.json(); const tps = Math.round(j.timings && j.timings.predicted_per_second || 0);
-    if (tps) { await save({ speed: { ...(S.st.speed || {}), [id]: tps } }); toast(`${T('speedMeasured')}: ${tps} ${T('tps')}`); renderNav(); if (S.tab === 'models') renderMain(); }
+    if (tps) { await save({ speed: { ...(S.st.speed || {}), [id + (spec ? '+spec' : '')]: tps } }); toast(`${T('speedMeasured')}: ${speedText() || tps + ' ' + T('tps')}`); showSpeed(); renderNav(); if (S.tab === 'models') renderMain(); }
   } catch {}
 }
 P.onEngine(e => {
@@ -515,7 +528,7 @@ function permCard(p) {
     <div class="perm-btns">${btns}</div>${site ? `<button class="perm-link" data-act="allowAll" data-v="${p.id}">${T('allowAllReq')}</button>` : ''}</div></div>`;
 }
 function actLine(kind, arg, a) {
-  const label = { file: T('aFile'), run: T('aRun'), read: T('aRead'), list: T('aList'), open: T('aOpen'), search: T('aSearch'), click: T('aClick'), type: T('aType'), scroll: T('aScroll'), back: T('aBack') }[kind];
+  const label = { file: T('aFile'), run: T('aRun'), read: T('aRead'), list: T('aList'), mkdir: T('aMkdir'), move: T('aMove'), open: T('aOpen'), search: T('aSearch'), click: T('aClick'), type: T('aType'), scroll: T('aScroll'), back: T('aBack') }[kind];
   let right = '';
   if (a) {
     const sm = { wait: T('sWait'), ask: T('sAsk'), work: T('sWork'), done: T('sDone'), denied: T('sDenied'), error: T('sError') };
@@ -532,7 +545,7 @@ function md(s, ctx) {
   h = h.replace(/&lt;think&gt;([\s\S]*?)(&lt;\/think&gt;|$)/g, '<div class="think">$1</div>');
   h = h.replace(/```([^\n`]*)\n?([\s\S]*?)(```|$)/g, (_, lang, code, end) => {
     lang = lang.trim(); code = code.replace(/\n$/, '');
-    const m = lang.match(/^(file|run|read|list|open|search|click|type|scroll|back):(.*)$/);
+    const m = lang.match(/^(file|run|read|list|mkdir|move|open|search|click|type|scroll|back):(.*)$/);
     if (m) {
       const a = ctx && ctx.acts && (!ctx.only || ctx.only.includes(m[1])) ? ctx.acts[ctx.k++] : null;
       if (m[1] !== 'file') return actLine(m[1], m[2].trim(), a);
@@ -552,7 +565,7 @@ function liveStatus(c) {
   if ((c.match(/```/g) || []).length % 2) {
     const lang = c.slice(c.lastIndexOf('```') + 3).split('\n')[0].trim();
     if (lang.startsWith('file:')) return T('stFile') + ' ' + lang.slice(5);
-    if (/^(run|read|list|open|search|click|type|scroll|back):/.test(lang)) return T('stAction');
+    if (/^(run|read|list|mkdir|move|open|search|click|type|scroll|back):/.test(lang)) return T('stAction');
     return T('stCode');
   }
   return T('stWriting');
@@ -568,7 +581,7 @@ function viewChat() {
   const srcSel = src.length < 2 ? '' : `<select class="pick" data-act="sel">${src.map(s => `<option value="${s[0]}" ${S.sel === s[0] ? 'selected' : ''}>${esc(s[1])}</option>`).join('')}</select>`;
   const head = `<div class="row fu" style="margin-bottom:12px;gap:8px">
     <div class="chips"><button class="tgl ${auto ? 'on' : ''}" data-act="autoAgent" title="${T('autoAgentD')}"><span class="knob"></span>${T('autoModel')}</button>
-      ${auto ? `<span class="pill" id="apill">${esc(S.lastAgent || T('autoAgentPick'))}</span>` : `<select class="pick" data-act="agentSel">${opts}</select>`}${srcSel}<span id="estatus">${S.engine && S.engine.stage !== 'ready' ? engineText() : ''}</span></div>
+      ${auto ? `<span class="pill" id="apill">${esc(S.lastAgent || T('autoAgentPick'))}</span>` : `<select class="pick" data-act="agentSel">${opts}</select>`}${srcSel}<span class="pill mono" id="spill" style="${speedText() ? '' : 'display:none'}">${esc(speedText())}</span><span id="estatus">${S.engine && S.engine.stage !== 'ready' ? engineText() : ''}</span></div>
     <div class="chips">
       <button class="ibtn" data-act="wsOpen" title="${T('folder')}: ${esc(S.ws || '')}">${ico('folder')}</button>
       <button class="ibtn ${S.panel ? 'on' : ''}" data-act="panel" title="${T('browser')}">${ico('globe')}</button>
@@ -593,17 +606,22 @@ function agentCounts(parts, onlyWork) {
 function chainHTML(m) {
   const ch = m.chain; const cur = ch.stages.findIndex(s => s.state === 'work');
   const steps = ch.stages.map((s, i) => `<span class="cstep ${s.state}">${s.state === 'work' ? '<span class="shimmer">' + T(STAGES[s.id]) + '</span>' : T(STAGES[s.id])}</span>${i < ch.stages.length - 1 ? '<span class="cline ' + (s.state === 'done' ? 'done' : '') + '"></span>' : ''}`).join('');
+  return `<div class="chain"><div class="csteps">${steps}</div><div class="cnow"><span class="dot led ${ch.stages.some(s => s.state === 'work') ? '' : 'off'}"></span><span class="cnt">${chainNow(m)}</span></div></div>`;
+}
+function chainNow(m) {
+  const ch = m.chain; const cur = ch.stages.findIndex(s => s.state === 'work');
   let line;
   if (cur >= 0) {
     const working = agentCounts(m.parts, true);
     const total = m.parts.filter(p => p.status === 'work').length;
-    line = ch.cooling ? `<span class="dot led"></span><span class="shimmer">${T('cooling')}</span>`
-      : `<span class="dot led"></span><span>${working.length ? (total > 1 ? T('agentsN')(total) + ' · ' : T('agent1') + ' · ') + working.join(', ') : T('stAccept')}</span>`;
+    line = ch.cooling ? `<span class="shimmer">${T('cooling')}</span>`
+      : `<span>${working.length ? (total > 1 ? T('agentsN')(total) + ' · ' : T('agent1') + ' · ') + working.join(', ') : T('stAccept')}</span>`;
   } else line = `<span class="muted">${T('agentsUsed')(m.parts.length)} · ${agentCounts(m.parts).join(' → ')}</span>`;
-  return `<div class="chain"><div class="csteps">${steps}</div><div class="cnow">${line}</div></div>`;
+  return line;
 }
+const chainRest = m => (m.content ? `<div style="margin-top:14px">${md(m.content)}</div>` : '') + (m.extra || []).map(a => actLine(a.kind, a.arg, a)).join('') + askHTML(m.ask);
 function msgInner(m) {
-  if (m.chain) return chainHTML(m) + (m.content ? `<div style="margin-top:14px">${md(m.content)}</div>` : '') + (m.extra || []).map(a => actLine(a.kind, a.arg, a)).join('') + askHTML(m.ask);
+  if (m.chain) return chainHTML(m) + `<div class="mrest">${chainRest(m)}</div>`;
   const extra = (m.extra || []).map(a => actLine(a.kind, a.arg, a)).join('');
   const ctx = { acts: m.actions, k: 0, only: m.parts ? ['file', 'run'] : null };
   if (!m.parts) return (m.agent ? `<div class="alabel">${esc(m.agent)}</div>` : '') + (m.content ? md(stripMem(m.content), ctx) : '') + (m.memNote ? `<div class="memnote">${ico('check', 12)}<span>${esc(m.memNote)}</span></div>` : '') + extra + askHTML(m.ask) + (m.live ? statusHTML(m.status || liveStatus(m.content)) : '');
@@ -618,6 +636,7 @@ function msgInner(m) {
 function msgHTML(m, i) {
   if (m.role === 'user') return `<div class="msg me">${esc(m.shown != null ? m.shown : m.content)}${(m.files || []).length ? `<div class="mfiles">${m.files.map(f => `<span class="achip">${esc(f.name)}</span>`).join('')}</div>` : ''}</div>`;
   if (m.role === 'tool') return `<div class="msg" data-i="${i}" style="display:none"></div>`;
+  if (m.stopped) return `<div class="msg stopped" data-i="${i}">${T('stopped')}</div>`;
   return `<div class="msg" data-i="${i}">${msgInner(m)}</div>`;
 }
 function addMsg(i) {
@@ -626,11 +645,41 @@ function addMsg(i) {
   box.insertAdjacentHTML('beforeend', msgHTML(S.msgs[i], i));
   box.scrollTop = box.scrollHeight;
 }
-function paint(i) {
-  const m = S.msgs[i]; if (!m || m.role === 'tool') return;
+// repaint at most once per frame; only the parts that really changed are touched,
+// so step animations and shimmers do not restart on every token
+const paintQ = new Set(); let paintRaf = 0, paintCost = 0, paintNext = 0;
+function paint(i) { paintQ.add(i); if (!paintRaf) paintRaf = requestAnimationFrame(flushPaint); }
+function flushPaint(now) {
+  paintRaf = 0; const box = $('#msgs'); if (!box) { paintQ.clear(); return; }
+  if (now < paintNext) { paintRaf = requestAnimationFrame(flushPaint); return; }
+  const t0 = performance.now();
+  const stick = box.scrollHeight - box.scrollTop - box.clientHeight < 220;
+  for (const i of paintQ) paintNow(i); paintQ.clear();
+  if (stick) box.scrollTop = box.scrollHeight;
+  paintCost = paintCost * 0.7 + (performance.now() - t0) * 0.3;
+  paintNext = now + Math.min(250, paintCost * 3);
+}
+function setHTML(el, html) { if (el._h !== html) { el.innerHTML = html; el._h = html; } }
+function patchChain(el, m) {
+  const steps = el.querySelectorAll('.cstep'), lines = el.querySelectorAll('.cline');
+  if (steps.length !== m.chain.stages.length) return false;
+  m.chain.stages.forEach((s, k) => {
+    const st = steps[k], cls = 'cstep ' + s.state;
+    if (st.className !== cls) { st.className = cls; st.innerHTML = s.state === 'work' ? '<span class="shimmer">' + T(STAGES[s.id]) + '</span>' : T(STAGES[s.id]); }
+    if (lines[k]) { const lc = 'cline' + (s.state === 'done' ? ' done' : ''); if (lines[k].className !== lc) lines[k].className = lc; }
+  });
+  const dot = el.querySelector('.cnow > .dot'); if (dot) dot.classList.toggle('off', !m.chain.stages.some(s => s.state === 'work'));
+  const cnt = el.querySelector('.cnow > .cnt'); if (!cnt) return false; setHTML(cnt, chainNow(m));
+  return true;
+}
+function paintNow(i) {
+  const m = S.msgs[i]; if (!m || m.role === 'tool' || m.stopped) return;
   const el = root.querySelector(`.msg[data-i="${i}"]`); if (!el) return;
-  el.innerHTML = msgInner(m);
-  const box = $('#msgs'); if (box.scrollHeight - box.scrollTop - box.clientHeight < 220) box.scrollTop = box.scrollHeight;
+  if (m.chain) {
+    const ch = el.querySelector(':scope > .chain'), rest = el.querySelector(':scope > .mrest');
+    if (ch && rest && patchChain(ch, m)) { setHTML(rest, chainRest(m)); return; }
+  }
+  setHTML(el, msgInner(m));
 }
 function setSendBtn() { const b = root.querySelector('.send'); if (!b) return; b.dataset.act = S.streaming ? 'stop' : 'send'; b.innerHTML = sendIcon(); }
 
@@ -679,6 +728,7 @@ function toApi(list) {
   const out = [];
   for (const m of list) {
     if (m.role === 'tool') out.push({ role: 'user', content: '[Action results]\n' + m.content });
+    else if (m.stopped) continue;
     else if (m.role === 'assistant') { const c = noThink(m.content || ''); if (c && !REFUSAL.test(c)) out.push({ role: 'assistant', content: c }); }
     else if (m.content) out.push({ role: 'user', content: m.content });
   }
@@ -691,7 +741,7 @@ function toApi(list) {
 // --- actions ---
 let actSeq = 0;
 function parseActions(text) {
-  const out = []; const re = /```(file|run|read|list|open|search|click|type|scroll|back):([^\n`]*)\n?([\s\S]*?)```/g; let m;
+  const out = []; const re = /```(file|run|read|list|mkdir|move|open|search|click|type|scroll|back):([^\n`]*)\n?([\s\S]*?)```/g; let m;
   while ((m = re.exec(text))) out.push({ id: 'a' + (++actSeq), kind: m[1], arg: m[2].trim(), body: m[3].replace(/\n$/, ''), state: 'wait' });
   return out;
 }
@@ -732,6 +782,8 @@ async function execAction(a, repaint, auto) {
       if (r.preview) { await browse(r.preview, true); res = `${a.arg} opened in the built-in browser.`; }
       else { a.out = r.noPython ? T('noPython') : (r.out || '').trim(); if (r.noPython) throw new Error(T('noPython')); res = `Ran ${a.arg}, exit code ${r.code}. Output:\n${(r.out || '').slice(-4000)}`; }
     }
+    else if (a.kind === 'mkdir') { await P.ws.mkdir(a.arg); res = `Folder created: ${a.arg}`; }
+    else if (a.kind === 'move') { const [f, t] = a.arg.split('|').map(x => x.trim()); if (!f || !t) throw new Error('use move:old|new'); await P.ws.move(f, t); res = `Moved ${f} → ${t}`; }
     else if (a.kind === 'read') res = `Content of ${a.arg}:\n${(await P.ws.read(a.arg)).slice(0, 8000)}`;
     else if (a.kind === 'list') { const l = await P.ws.list(a.arg || '.'); res = `Folder ${a.arg || '.'}:\n${l.join('\n') || '(empty)'}`; }
     else if (a.kind === 'open') {
@@ -789,7 +841,7 @@ async function autoFiles(msg, userText, agentId) {
   if (!save && !build) return [];
   const text = noThink(msg.content || '');
   const blocks = []; const re = /```([^\n`]*)\n([\s\S]*?)```/g; let m;
-  while ((m = re.exec(text))) { const lang = m[1].trim().toLowerCase(); if (/^(file|run|read|list|open|search|click|type|scroll|back):/.test(lang)) continue; if (m[2].trim().length > 20) blocks.push({ lang, code: m[2].replace(/\n$/, '') }); }
+  while ((m = re.exec(text))) { const lang = m[1].trim().toLowerCase(); if (/^(file|run|read|list|mkdir|move|open|search|click|type|scroll|back):/.test(lang)) continue; if (m[2].trim().length > 20) blocks.push({ lang, code: m[2].replace(/\n$/, '') }); }
   const files = [];
   const html = blocks.find(b => b.lang === 'html' || /^\s*<!doctype html|<html[\s>]/i.test(b.code));
   if (html) {
@@ -1020,8 +1072,8 @@ const fewshot = () => FEWSHOT[L()].map(([role, content]) => ({ role, content }))
 function pickAgent(t) {
   const def = id => { const a = ourAgents().find(x => x[0] === id); return { id: a[0], name: a[1], prompt: a[3], tools: a[4] }; };
   const build = BUILD_RE.test(t) || /(код|программ|скрипт|сайт|html|python|питон|ошибк|баг|code|bug)/i.test(t);
-  if (!build && (openIntent(t) || /(найди|поищи|загугли|новост|курс|погод|что такое|кто так|в интернете|расскажи о|узнай|search|find|look up|news|weather)/i.test(t))) return def('browser');
-  if (!build && /(файл|папк|переимен|разлож|отсортир|сортир|документ|дубликат|folder|file|rename|organi[sz]e|sort)/i.test(t)) return def('files');
+  if (!build && (openIntent(t) || /(найди|поищи|загугли|новост|курс (доллар|евро|валют|рубл|биткоин)|погод|в интернете|в сети|актуальн|сегодня|узнай|цен[аы] на|search|find|look up|news|weather|price of)/i.test(t))) return def('browser');
+  if (!build && /(файл|папк|переимен|перемест|разлож|отсортир|сортир|документ|дубликат|рабоч\w* папк|folder|file|rename|move|organi[sz]e|sort)/i.test(t)) return def('files');
   if (build) return def('coder');
   return def('chat');
 }
@@ -1050,6 +1102,7 @@ async function runAgent(ag, userText, signal) {
   S.curAgentName = ag.name;
   for (let round = 0; round < 6; round++) {
     if (S.temps?.hot) { const w = { role: 'assistant', content: '', live: true, status: T('cooling') }; S.msgs.push(w); const wi = S.msgs.length - 1; addMsg(wi); await cool(signal); S.msgs.splice(wi, 1); root.querySelector(`.msg[data-i="${wi}"]`)?.remove(); }
+    if (round === 0 && ag.id === 'files') { let l = []; try { l = await P.ws.list('.'); } catch (e) {} S.msgs.push({ role: 'tool', content: `Workspace files (${l.length}):\n${l.join('\n') || '(empty)'}` }); addMsg(S.msgs.length - 1); }
     const history = toApi(S.msgs.slice(-24));
     const msg = { role: 'assistant', content: '', live: true, agent: round === 0 ? ag.name : null }; S.msgs.push(msg); const idx = S.msgs.length - 1; addMsg(idx);
     try {
@@ -1065,12 +1118,12 @@ async function runAgent(ag, userText, signal) {
     const acts = parseActions(noThink(msg.content));
     if (!acts.length) { if (SAVE_RE.test(userText)) await applyAuto(msg, idx, userText, ag.id); return; }
     msg.actions = acts; paint(idx);
-    const files = acts.filter(a => a.kind === 'file');
-    const allowed = files.length ? await askSave(msg, idx, files.map(a => a.arg)) : true;
+    const files = acts.filter(a => /^(file|mkdir|move)$/.test(a.kind));
+    const allowed = files.length ? await askSave(msg, idx, files.map(a => a.kind === 'move' ? a.arg.replace('|', ' → ') : a.kind === 'mkdir' ? a.arg.replace(/\/?$/, '/') : a.arg)) : true;
     const results = [];
     for (const a of acts) {
       if (signal.aborted) return;
-      if (a.kind === 'file' && !allowed) { a.state = 'denied'; paint(idx); results.push(`${a.arg}: the user did not allow saving.`); continue; }
+      if (/^(file|mkdir|move)$/.test(a.kind) && !allowed) { a.state = 'denied'; paint(idx); results.push(`${a.arg}: the user did not allow saving.`); continue; }
       results.push(await execAction(a, () => paint(idx)));
     }
     S.msgs.push({ role: 'tool', content: results.join('\n\n') }); addMsg(S.msgs.length - 1);
@@ -1097,7 +1150,7 @@ function lastCode(s, wantHtml) {
   const re = /```([^\n`]*)\n([\s\S]*?)(```|$)/g; let m, best = null;
   while ((m = re.exec(noThink(s || '')))) {
     let l = m[1].trim().toLowerCase(); if (m[2].trim().length < 30) continue;
-    if (l.startsWith('file:')) l = l.split('.').pop(); else if (/^(run|read|list|open|search|click|type|scroll|back):/.test(l)) continue;
+    if (l.startsWith('file:')) l = l.split('.').pop(); else if (/^(run|read|list|mkdir|move|open|search|click|type|scroll|back):/.test(l)) continue;
     const isHtml = l === 'html' || /^\s*(<!doctype html|<html)/i.test(m[2]);
     if (!wantHtml || isHtml) best = { lang: isHtml ? 'html' : l, code: m[2].replace(/\n$/, ''), closed: !!m[3] };
   }
@@ -1131,7 +1184,7 @@ function extractCode(s, wantHtml) {
   const text = noThink(s || '');
   const blocks = []; const re = /```([^\n`]*)\n([\s\S]*?)(```|$)/g; let m;
   while ((m = re.exec(text))) {
-    let l = m[1].trim().toLowerCase(); if (/^(run|read|list|open|search|click|type|scroll|back):/.test(l)) continue;
+    let l = m[1].trim().toLowerCase(); if (/^(run|read|list|mkdir|move|open|search|click|type|scroll|back):/.test(l)) continue;
     if (l.startsWith('file:')) l = l.split('.').pop();
     if (m[2].trim().length > 20) blocks.push({ lang: l, code: m[2].replace(/\n$/, ''), closed: !!m[3] });
   }
@@ -1354,6 +1407,7 @@ async function sendMsg() {
   ta.value = ''; ta.style.height = 'auto';
   S.msgs.push({ role: 'user', content: text, shown: typed, files: files.map(f => ({ name: f.name, size: f.size })) }); addMsg(S.msgs.length - 1);
   const ctl = new AbortController(); S.streaming = ctl; setSendBtn(); lockComposer(true); Sound.soft();
+  const from = S.msgs.length;
   const auto = S.st.autoAgent !== false;
   const ag = auto ? pickAgent(text) : curAgentDef();
   const plan = chainPlan(text);
@@ -1382,8 +1436,9 @@ async function sendMsg() {
         if (links.length && /(открой|открыть|зайди|перейди|запусти|включи|\bopen\b)/i.test(typed)) {
           const o = { id: 'a' + (++actSeq), kind: 'open', arg: links[0], state: 'wait' }; m.extra.push(o);
           const page = await execAction(o, () => paint(i), false);
-          S.msgs.push({ role: 'tool', content: `Opened ${links[0]} in the built-in browser.\n${String(page).slice(0, 3000)}\nTell the user in one or two short sentences that the site is open in the browser on the right. Do not list links.` }); addMsg(S.msgs.length - 1);
-        } else S.msgs.push({ role: 'tool', content: res + '\nAnswer from these results and cite the best links. If you need more, open a link yourself. Never tell the user about blocks or tools.' }); addMsg(S.msgs.length - 1);
+          S.msgs.push({ role: 'tool', content: `Opened ${links[0]} in the built-in browser.\n${String(page).slice(0, 3000)}\nTell the user in one or two short sentences that the site is open in the browser on the right. Do not list links.` });
+        } else S.msgs.push({ role: 'tool', content: res + '\nAnswer from these results and cite the best links. If you need more, open a link yourself. Never tell the user about blocks or tools.' });
+        addMsg(S.msgs.length - 1);
       }
       await runAgent(ag, text, ctl.signal);
     }
@@ -1391,9 +1446,15 @@ async function sendMsg() {
     if (e.name !== 'AbortError') { S.msgs.push({ role: 'assistant', content: '⚠ ' + (e.message || e) }); addMsg(S.msgs.length - 1); }
   }
   Object.values(S.pending).forEach(r => r(false)); S.pending = {};
-  S.streaming = null; setSendBtn(); lockComposer(false); Sound.done(); $('#input')?.focus();
+  const stopped = ctl.signal.aborted;
+  if (stopped) {
+    // drop everything half-written in this request, keep only the note
+    paintQ.clear(); S.msgs.splice(from); S.msgs.push({ role: 'assistant', content: '', stopped: true });
+    const box = $('#msgs'); if (box) { box.querySelectorAll('.msg[data-i]').forEach(el => { if (+el.dataset.i >= from) el.remove(); }); addMsg(S.msgs.length - 1); }
+  }
+  S.streaming = null; setSendBtn(); lockComposer(false); stopped ? Sound.tick(900) : Sound.done(); $('#input')?.focus();
   saveChat().catch(() => {});
-  P.notify('PULSAR', T('notifyDone')).catch(() => {});
+  if (!stopped) P.notify('PULSAR', T('notifyDone')).catch(() => {});
 }
 
 // ---------- events ----------
@@ -1434,7 +1495,7 @@ root.addEventListener('click', async e => {
       await P.stop(); S.running = null; S.engine = null; S.msgs = []; S.chatId = null; S.lastProject = null; S._lastTab = null;
       renderNav(); renderMain(); toast(T('ended')); break;
     case 'send': sendMsg(); break;
-    case 'stop': S.streaming?.abort(); break;
+    case 'stop': S.streaming?.abort(); Object.values(S.pending).forEach(r => r(false)); S.pending = {}; break;
     case 'allow': case 'deny': { const r = S.pending[v]; delete S.pending[v]; r && r(b.dataset.act === 'allow'); break; }
     case 'autoAgent': await save({ autoAgent: S.st.autoAgent === false }); Sound.tick(1500); S._lastTab = 'chat'; renderMain(); break;
     case 'kimiSave': {
@@ -1464,6 +1525,7 @@ root.addEventListener('click', async e => {
     case 'attach': { const f = await P.pickFiles(); addAttach(f); break; }
     case 'unattach': S.attach.splice(+v, 1); drawAttach(); break;
     case 'dlHelper': downloadModel(v); break;
+    case 'draftTgl': { const off = { ...(S.st.draftOff || {}) }; if (S.st.spec === false) { await save({ spec: true }); delete off[v]; } else if (off[v]) delete off[v]; else off[v] = true; await save({ draftOff: off }); Sound.tick(1500); renderMain(); if (S.running && draftFor(findM(S.running)) === v) toast(T('specRestart')); break; }
     case 'specTgl': await save({ spec: S.st.spec === false }); Sound.tick(1500); renderMain(); if (S.running && draftFor(findM(S.running))) toast(T('specRestart')); break;
     case 'allowSite': { const h = b.dataset.h; if (h) await save({ trustedHosts: [...new Set([...(S.st.trustedHosts || []), h])] }); const r = S.pending[v]; delete S.pending[v]; r && r(true); Sound.tick(1500); break; }
     case 'allowAll': { S.allowAll = true; const r = S.pending[v]; delete S.pending[v]; r && r(true); break; }
@@ -1531,5 +1593,5 @@ function applyTheme() { document.documentElement.classList.toggle('light', S.st.
   if (S.st.apis) await save({ apis: [] });
   if (S.st.agent === 'team' || !['chat', 'coder', 'files', 'browser'].includes(S.st.agent || 'coder')) await save({ agent: 'chat' });
   if (S.st.lang) document.documentElement.lang = S.st.lang;
-  if (!S.st.lang) langScreen(); else intro();
+  if (!S.st.lang) langScreen(); else if (!S.st.introSeen) intro(); else afterIntro();
 })();

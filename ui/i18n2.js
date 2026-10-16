@@ -69,11 +69,15 @@ full file content
 \`\`\`
 \`\`\`list:.
 \`\`\`
+\`\`\`mkdir:photos
+\`\`\`
+\`\`\`move:IMG_1.jpg|photos/IMG_1.jpg
+\`\`\`
 \`\`\`open:https://example.com
 \`\`\`
 \`\`\`search:what to look up
 \`\`\`
-file: creates or overwrites a file. run: runs a .py or .js file (stdin is closed, so avoid input(); use fixed example values) or opens an .html file in the built-in preview. read: reads a file. list: lists a folder. open: opens a website in the built-in browser and gives you its text. search: searches the internet and gives you results with links.
+file: creates or overwrites a file. run: runs a .py or .js file (stdin is closed, so avoid input(); use fixed example values) or opens an .html file in the built-in preview. read: reads a file. list: lists a folder. mkdir:folder creates a folder. move:old/path|new/path moves or renames a file or folder (nothing is ever deleted; the user is asked first). open: opens a website in the built-in browser and gives you its text. search: searches the internet and gives you results with links.
 When the user asks to make a website or program, write the COMPLETE code in one file block (for a site: one html file with CSS and JS inside, modern clean design). When the user asks to open a site, use open:. Never answer that you cannot save files, open websites or access the internet: you can, with these blocks.
 After your blocks, stop. The results come back to you in the next message; then continue or give the final answer. Do not repeat a block that already succeeded. Answer in the user's language.`;
 const PROVIDERS = [];
@@ -84,12 +88,12 @@ Object.assign(I18N.en, { autoModel: 'Auto', autoModelD: 'PULSAR picks the best d
   cloudFree: 'Cloud · free', kimiD: 'Very strong model by Moonshot AI. Runs online, nothing is downloaded. Needs a free OpenRouter key.', kimiHow: 'The key is free:' });
 AGENTS.ru = [
   ['coder', 'PULSAR CODE', 'Пишет код, сайты и программы. Сам сохраняет файлы и запускает их.', 'Ты PULSAR CODE — сильный программист и веб-дизайнер. Пиши полный рабочий код без сокращений и заглушек. Сайт — один полный HTML-файл со встроенными CSS и JS: современный дизайн, крупная типографика, много воздуха, плавные анимации, адаптивность. Сохраняй файлы и запускай код, чтобы проверить. Объясняй коротко.', true],
-  ['files', 'FILE SUP', 'Создаёт, читает и раскладывает файлы в рабочей папке.', 'Ты FILE SUP — помощник по файлам. Работай с файлами в рабочей папке: смотри список, читай, создавай и переписывай. Ничего не удаляй.', true],
+  ['files', 'FILE SUP', 'Создаёт, читает и раскладывает файлы в рабочей папке.', 'Ты FILE SUP — помощник по файлам. Список файлов рабочей папки тебе уже дан. Действуй сразу блоками: read — прочитать, file — создать или переписать, mkdir — создать папку, move — переместить или переименовать. Чтобы разложить файлы, создай папки по типу (Документы, Картинки, Код…) и перемести туда файлы. Ничего не удаляй. В конце коротко скажи, что сделал.', true],
   ['browser', 'PULSAR IN BROWSER', 'Ищет в интернете, открывает сайты во встроенном браузере и делает выжимку.', 'Ты PULSAR IN BROWSER — агент для интернета. Ищи информацию, открывай сайты во встроенном браузере, читай их, отделяй факты от догадок и давай короткий вывод со ссылками.', true]
 ];
 AGENTS.en = [
   ['coder', 'PULSAR CODE', 'Writes code, websites and programs. Saves and runs files itself.', 'You are PULSAR CODE, a strong programmer and web designer. Write complete working code with no placeholders. A website is one complete HTML file with embedded CSS and JS: modern design, large type, whitespace, smooth animations, responsive. Save files and run code to check. Explain briefly.', true],
-  ['files', 'FILE SUP', 'Creates, reads and organizes files in the workspace.', 'You are FILE SUP, a file assistant. Work with files in the workspace: list, read, create and rewrite. Never delete anything.', true],
+  ['files', 'FILE SUP', 'Creates, reads and organizes files in the workspace.', 'You are FILE SUP, a file assistant. You already get the workspace file list. Act right away with blocks: read, file (create or rewrite), mkdir (new folder), move (move or rename). To organize, create folders by type (Documents, Images, Code…) and move files there. Never delete anything. Finish with a short summary.', true],
   ['browser', 'PULSAR IN BROWSER', 'Searches the web, opens sites in the built-in browser, summarizes.', 'You are PULSAR IN BROWSER, a web agent. Search for information, open sites in the built-in browser, read them, separate facts from guesses, give a short conclusion with links.', true]
 ];
 
@@ -176,10 +180,10 @@ Object.assign(I18N.ru, { permSiteT: 'Открыть сайт', permSiteD: 'Аг�
   alwaysFor: h => `Всегда для ${h.replace(/^www\./, '')}`, oTrusted: 'Доверенные сайты', oTrustedD: 'Сайты, которые агенты открывают без вопроса', clear: 'очистить' });
 Object.assign(I18N.en, { permSiteT: 'Open website', permSiteD: 'The agent will open the page in the built-in browser and read it.', permSaveT: n => n === 1 ? 'Save the file to your computer' : `Save ${n} files to your computer`, permSaveD: 'Files will appear in Documents\\PULSAR.',
   alwaysFor: h => `Always for ${h.replace(/^www\./, '')}`, oTrusted: 'Trusted sites', oTrustedD: 'Sites the agents open without asking', clear: 'clear' });
-Object.assign(I18N.ru, { draftAuto: 'Качаю ускоритель {d} для {m} — подключу сам', catHelp: 'Ускорители', catHelpD: 'помогают большой модели отвечать быстрее; PULSAR сам видит модель и качает нужный при запуске', helperTag: 'Помощник', helperD: 'Ускоряет в 1,5–2 раза:', helperOn: 'Помогает · вкл', helperOff: 'Выключен',
+Object.assign(I18N.ru, { aMkdir: 'Новая папка', aMove: 'Переместить', stopped: 'Ответ прерван', withBoost: 'с ускорителем', noBoost: 'без', draftAuto: 'Качаю ускоритель {d} для {m} — подключу сам', catHelp: 'Ускорители', catHelpD: 'помогают большой модели отвечать быстрее; PULSAR сам видит модель и качает нужный при запуске', helperTag: 'Помощник', helperD: 'Ускоряет в 1,5–2 раза:', helperOn: 'Помогает · вкл', helperOff: 'Выключен',
   specOn: 'Ускоритель включён — ответы быстрее', specRestart: 'Перезапусти модель, чтобы применить', oSpec: 'Ускорители', oSpecD: 'Маленькая модель подсказывает большой — ответы быстрее',
   oMemory: 'Память HELLO PULSAR', oMemoryD: 'Что агент запомнил о тебе между чатами', memSaved: 'Запомнил:', memForgot: 'Забыл' });
-Object.assign(I18N.en, { draftAuto: 'Downloading booster {d} for {m} — will plug it in automatically', catHelp: 'Boosters', catHelpD: 'they help a big model answer faster; PULSAR detects the model and downloads the right one on launch', helperTag: 'Helper', helperD: 'Speeds up 1.5–2×:', helperOn: 'Helping · on', helperOff: 'Off',
+Object.assign(I18N.en, { aMkdir: 'New folder', aMove: 'Move', stopped: 'Answer stopped', withBoost: 'with booster', noBoost: 'without', draftAuto: 'Downloading booster {d} for {m} — will plug it in automatically', catHelp: 'Boosters', catHelpD: 'they help a big model answer faster; PULSAR detects the model and downloads the right one on launch', helperTag: 'Helper', helperD: 'Speeds up 1.5–2×:', helperOn: 'Helping · on', helperOff: 'Off',
   specOn: 'Booster on — faster answers', specRestart: 'Restart the model to apply', oSpec: 'Boosters', oSpecD: 'A small model drafts for the big one — faster answers',
   oMemory: 'HELLO PULSAR memory', oMemoryD: 'What the agent remembers about you between chats', memSaved: 'Remembered:', memForgot: 'Forgot' });
 
