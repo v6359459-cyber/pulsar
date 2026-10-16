@@ -5,7 +5,7 @@
 **Free AI agents that run on your own PC.**
 No cloud, no account, no subscription — download a model and start building.
 
-[**Download for Windows**](https://github.com/v6359459-cyber/pulsar/releases/latest) · [**▶ Watch the demo**](https://v6359459-cyber.github.io/pulsar/#demo) · [Русский](#по-русски)
+[**Download for Windows**](https://github.com/v6359459-cyber/pulsar/releases/latest) · [Watch the demo with sound (52 s)](https://github.com/v6359459-cyber/pulsar/releases/download/v0.9.0/PULSAR-demo.mp4) · [Русский](#по-русски)
 
 <img src="docs/demo.gif" alt="PULSAR demo" width="880">
 
@@ -22,9 +22,15 @@ No cloud, no account, no subscription — download a model and start building.
 - **Agents that actually do things.** They write files, run code, open websites and read them — inside a workspace folder you control.
 - **Several agents in one request.** Send a link and say "make a site like this" — one agent studies the example, coders build it (two at once if your GPU allows), PULSAR runs the result, and another agent fixes the errors it finds.
 - **Asks before saving.** Nothing is written to your PC without your OK.
-- **Built-in browser** with tabs, and an output panel for running Python / JavaScript.
+- **Built-in browser** with tabs. Agents can click, type and scroll in it — and ask before opening every new website.
+- **Code editor and output panel** on the side: edit what the agents made, run Python / JavaScript (games with keyboard input work). Python is bundled, nothing to install.
+- **Attach files** (txt, pdf, docx, csv, code) and ask questions about them.
+- **Projects** tab with everything your agents built; continue any project in chat.
+- **Use your own GGUF models** from disk.
+- **Runs in the background** from the tray, with a Windows notification when agents finish.
+- **Light and dark themes.**
 - **Overheat protection.** Above 80 °C PULSAR lowers its load and waits for your PC to cool down.
-- **Chat history, resumable model downloads, auto-updates.**
+- **Chat history, resumable model downloads, auto-updates** (PULSAR checks for updates right after the intro and installs them by itself).
 - **English and Russian** interface.
 
 ## Agents

@@ -57,7 +57,7 @@ const PROVIDERS_ALL = [
     ru: 'Недорогой и сильный агент для кода и рассуждений.', en: 'Cheap and strong agent for code and reasoning.' }
 ];
 
-const TOOLS_PROMPT = `
+let TOOLS_PROMPT = `
 You work inside PULSAR on the user's Windows PC and you CAN act on it inside the workspace folder. Never say you have no access to the PC; act instead.
 To act, write one or more blocks exactly in this format (paths are relative to the workspace folder):
 \`\`\`file:folder/name.ext
@@ -141,3 +141,31 @@ Object.assign(I18N.en, { updReady: v => `Version ${v} is ready`, updBtn: 'Restar
 
 Object.assign(I18N.ru, { running: 'работает', runInputPh: 'Ввод для программы — Enter, чтобы отправить' });
 Object.assign(I18N.en, { running: 'running', runInputPh: 'Input for the program — press Enter to send' });
+
+Object.assign(I18N.ru, { editor: 'Редактор', openWin: 'Открыть в Windows', unsaved: 'не сохранено', tProjects: 'Проекты', projSub: 'Все сайты и программы, которые сделали агенты.', projEmpty: 'Пока пусто — попроси агента сделать сайт, и он появится здесь.',
+  projContinue: 'Продолжить в чате', projCont: d => `Продолжаем работу над «${d}» — напиши, что изменить`, filesN: 'файлов',
+  catMine: 'Мои модели', catMineD: 'GGUF-файлы с твоего диска', addModel: 'Добавить свою модель', addModelD: 'Выбери .gguf файл на диске — копировать не нужно',
+  oTheme: 'Тема', oThemeD: 'Тёмная или светлая', light: 'Светлая', dark: 'Тёмная', oTray: 'Работа в фоне', oTrayD: 'Крестик сворачивает PULSAR в трей, агенты продолжают работать',
+  updChecking: 'Проверка обновлений…', updUpdating: v => `Обновляю PULSAR до ${v}…`, updRestart: 'Перезапускаю…', notifyDone: 'Агенты закончили работу',
+  attachT: 'Прикрепить файл (txt, pdf, docx, csv, код)', attachAsk: 'Разбери прикреплённые файлы',
+  askSite: 'Открыть сайт', askSearch: 'Искать в интернете', askSearchRefs: 'Найти похожие сайты для примера', allowAllReq: 'Разрешать все в этом запросе',
+  aClick: 'Нажатие', aType: 'Ввод', aScroll: 'Прокрутка', aBack: 'Назад' });
+Object.assign(I18N.en, { editor: 'Editor', openWin: 'Open in Windows', unsaved: 'unsaved', tProjects: 'Projects', projSub: 'All websites and programs your agents made.', projEmpty: 'Nothing yet — ask an agent to make a site and it will appear here.',
+  projContinue: 'Continue in chat', projCont: d => `Continuing "${d}" — tell me what to change`, filesN: 'files',
+  catMine: 'My models', catMineD: 'GGUF files from your disk', addModel: 'Add your own model', addModelD: 'Pick a .gguf file — no copy needed',
+  oTheme: 'Theme', oThemeD: 'Dark or light', light: 'Light', dark: 'Dark', oTray: 'Run in background', oTrayD: 'Close button hides PULSAR to the tray, agents keep working',
+  updChecking: 'Checking for updates…', updUpdating: v => `Updating PULSAR to ${v}…`, updRestart: 'Restarting…', notifyDone: 'Agents finished their work',
+  attachT: 'Attach a file (txt, pdf, docx, csv, code)', attachAsk: 'Look at the attached files',
+  askSite: 'Open website', askSearch: 'Search the web', askSearchRefs: 'Find similar sites as examples', allowAllReq: 'Allow all for this request',
+  aClick: 'Click', aType: 'Type', aScroll: 'Scroll', aBack: 'Back' });
+TOOLS_PROMPT = TOOLS_PROMPT.replace('After your blocks, stop.', `Browser control (after open:, you get the page text and a numbered list of interactive elements):
+\`\`\`click:5
+\`\`\`
+\`\`\`type:3|text to type{enter}
+\`\`\`
+\`\`\`scroll:down
+\`\`\`
+\`\`\`back:
+\`\`\`
+click: clicks element N. type: types into field N ({enter} at the end submits). scroll: down or up. back: previous page. The user is asked before every new website.
+After your blocks, stop.`);

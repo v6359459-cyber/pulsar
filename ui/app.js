@@ -27,6 +27,9 @@ const CATALOG = [
   { id: 'qwen25-14b', cat: 'power', name: 'Qwen 2.5 14B', repos: ['bartowski/Qwen2.5-14B-Instruct-GGUF'], size: 9.0, layers: 48, kv: 98, tags: ['general', 'code'], ru: 'Умнее 7B-моделей. Лучше с видеокартой от 12 ГБ.', en: 'Smarter than 7B models. Best with a 12 GB GPU.' },
   { id: 'qwen25-32b', cat: 'power', name: 'Qwen 2.5 32B', repos: ['bartowski/Qwen2.5-32B-Instruct-GGUF'], size: 19.9, layers: 64, kv: 131, tags: ['general', 'code'], ru: 'Очень умная и очень тяжёлая.', en: 'Very smart and very heavy.' }
 ];
+function allModels() {
+  return [...CATALOG, ...(S.st.customModels || []).map(c => ({ id: c.id, cat: 'mine', name: c.name, path: c.path, size: c.sizeGB || 5, layers: 32, kv: 64, tags: ['general', 'code'], ru: 'Твоя модель с диска', en: 'Your model from disk' }))];
+}
 const CATS = [['fast', 'catFast'], ['code', 'catCode'], ['logic', 'catLogic'], ['power', 'catPower']];
 
 const S = { partial: {}, chats: [], chatId: null, st: {}, tab: 'models', local: new Set(), dl: {}, running: null, engine: null, msgs: [], streaming: null, busy: null };
@@ -106,7 +109,22 @@ function intro() {
   if (S.st.sound !== false) Sound.intro();
   introTimer = setTimeout(afterIntro, 11400);
 }
-function afterIntro() { clearTimeout(introTimer); if (!S.st.hw) scanScreen(); else appScreen(); }
+async function afterIntro() {
+  clearTimeout(introTimer); Sound.stopAll();
+  if (S._afterIntro) return; S._afterIntro = true;
+  await updateStep();
+  if (!S.st.hw) scanScreen(); else appScreen();
+}
+async function updateStep() {
+  root.innerHTML = `<div class="screen center" style="flex-direction:column;gap:26px"><div style="position:relative;width:90px;height:90px"><div class="ring"></div><div class="ring" style="animation-delay:1.06s"></div><div class="led" style="position:absolute;top:50%;left:50%;width:6px;height:6px;margin:-3px;border-radius:3px;background:#fff"></div></div>
+    <div class="fu" id="updtext" style="font-size:20px;font-weight:300">${T('updChecking')}</div><div class="track fu" style="width:260px;opacity:0" id="updtrack"><div id="updbar" style="width:0%"></div></div></div>`;
+  const r = await Promise.race([P.checkUpdate().catch(() => ({})), new Promise(res => setTimeout(() => res({}), 9000))]);
+  if (!r || !r.available) return;
+  document.getElementById('updtext').textContent = T('updUpdating')(r.version);
+  document.getElementById('updtrack').style.opacity = 1;
+  const ok = await new Promise(res => { const t0 = Date.now(); const tick = () => { if (S.update && S.update.state === 'ready') return res(true); if (Date.now() - t0 > 15 * 60000) return res(false); setTimeout(tick, 500); }; tick(); });
+  if (ok) { document.getElementById('updtext').textContent = T('updRestart'); await new Promise(r => setTimeout(r, 800)); P.installUpdate(); await new Promise(() => {}); }
+}
 
 async function scanScreen() {
   Sound.stopAll();
@@ -135,26 +153,31 @@ async function scanScreen() {
 
 async function appScreen() {
   Sound.stopAll();
-  S.local = new Set(await P.localModels());
+  S.local = new Set([...(await P.localModels()), ...(S.st.customModels || []).map(c => c.id)]);
   const info = await P.engineInfo(); S.running = info ? info.id : null; S.slots = info ? info.slots || 1 : 1;
   S.ws = await P.ws.get(); S.partial = await P.partials(); S.chats = await P.chats.list();
   root.innerHTML = `<div class="screen"><nav class="fu" id="nav"></nav>
     <div class="mid"><main id="main"></main>
-      <div id="drawer" class="drawer"><div class="dhead"><span style="display:flex;align-items:center;gap:10px">${ico('play', 13)}<span>${T('output')}</span><span class="mono small muted" id="dtitle"></span><span id="dcode" class="mono small"></span></span>
-        <span><button class="ib sm" data-act="drerun" title="${T('run')}">${ico('reload', 14)}</button><button class="ib sm" data-act="dclose" aria-label="close">${ico('x', 14)}</button></span></div><pre id="out"></pre><div class="runbar" id="runbar" style="display:none"><span class="mono small muted">›</span><input id="runin" placeholder="${T('runInputPh')}" autocomplete="off"><button class="ib sm" data-act="runSend" aria-label="send">${ico('fwd', 14)}</button></div></div></div>
+      </div>
+    <aside id="codepanel" class="panel cpanel"><div class="bshell">
+      <div class="btabs"><div class="btablist"><button class="ctab on" data-act="ctab" data-v="edit">${T('editor')}</button><button class="ctab" data-act="ctab" data-v="out">${T('output')}</button><span class="mono small muted" id="cfile" style="margin-left:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></div><button class="ib sm" data-act="cclose" aria-label="close">${ico('x', 14)}</button></div>
+      <div id="cedit" class="pbody"><div class="cbar"><button class="cb" data-act="csave">${T('saveFile')} · Ctrl+S</button><button class="cb pri" data-act="crun">${T('run')}</button><button class="cb" data-act="cext">${T('openWin')}</button><span id="cstate" class="mono small muted"></span></div><div id="cm" class="cmhost"></div></div>
+      <div id="cout" class="pbody hidden"><div class="dhead"><span style="display:flex;align-items:center;gap:10px">${ico('play', 13)}<span class="mono small muted" id="dtitle"></span><span id="dcode" class="mono small"></span></span>
+        <span><button class="ib sm" data-act="drerun" title="${T('run')}">${ico('reload', 14)}</button></span></div><pre id="out"></pre><div class="runbar" id="runbar" style="display:none"><span class="mono small muted">›</span><input id="runin" placeholder="${T('runInputPh')}" autocomplete="off"><button class="ib sm" data-act="runSend" aria-label="send">${ico('fwd', 14)}</button></div></div>
+    </div></aside>
     <aside id="panel" class="panel"><div class="bshell">
       <div class="btabs"><div id="btabs" class="btablist"></div><button class="ib sm" data-act="pclose" aria-label="close">${ico('x', 14)}</button></div>
       <div class="bbar"><button class="ib sm" data-act="wvBack" aria-label="back">${ico('back', 15)}</button><button class="ib sm" data-act="wvFwd" aria-label="forward">${ico('fwd', 15)}</button><button class="ib sm" data-act="wvReload" aria-label="reload">${ico('reload', 14)}</button>
         <label class="addrbox">${ico('lock', 13)}<input id="addr" placeholder="${T('addrPh')}"></label><button class="ib sm" data-act="wvExt" title="${T('openExt')}">${ico('ext', 14)}</button></div>
       <div id="bprog" class="bprog"></div><div id="bviews" class="bviews"></div></div></aside></div>`;
-  initBrowser();
+  initBrowser(); initEditor();
   S.panel = null;
   S._lastTab = null;
   renderNav(); renderMain();
   P.monitor(S.st.load !== false);
 }
 function renderNav() {
-  const tabs = [['chat', 'tChat'], ['models', 'tModels'], ['opt', 'tOpt'], ['agents', 'tAgents']];
+  const tabs = [['chat', 'tChat'], ['projects', 'tProjects'], ['models', 'tModels'], ['opt', 'tOpt'], ['agents', 'tAgents']];
   const hw = S.st.hw || {}; const [pname] = profile();
   const sp = S.running && S.st.speed && S.st.speed[S.running];
   $('#nav').innerHTML = `<div class="brand"><div class="dot led"></div>PULSAR</div>
@@ -171,7 +194,8 @@ function renderMain() {
   const same = S._lastTab === S.tab; S._lastTab = S.tab;
   m.classList.toggle('still', same);
   m.style.padding = S.tab === 'chat' ? '48px 56px 28px' : '';
-  m.innerHTML = ({ chat: viewChat, models: viewModels, opt: viewOpt, agents: viewAgents, api: viewApi }[S.tab])();
+  if (S.tab === 'projects') { m.innerHTML = viewProjects(); loadProjects(); }
+  else m.innerHTML = ({ chat: viewChat, models: viewModels, opt: viewOpt, agents: viewAgents, api: viewApi }[S.tab])();
   if (S.tab === 'chat') { const box = $('#msgs'); box.scrollTop = box.scrollHeight; $('#input')?.focus(); }
 }
 
@@ -200,8 +224,12 @@ function viewModels() {
     return `<div class="sec fu" style="animation-delay:${.12 + k * .02}s">${T(c[1])} <span style="letter-spacing:0;text-transform:none;color:#555">— ${T(c[1] + 'D')}</span></div>
       <div class="grid">${list.map(({ m, p }) => modelCard(m, p, k++)).join('')}</div>`;
   }).join('');
+  const mine = (S.st.customModels || []).map(c => allModels().find(m => m.id === c.id)).filter(Boolean);
+  const mineSec = `<div class="sec fu" style="animation-delay:.11s">${T('catMine')} <span style="letter-spacing:0;text-transform:none;color:#555">— ${T('catMineD')}</span></div>
+    <div class="grid">${mine.map((m, k) => modelCard(m, plan(m), k).replace(/<button class="btn ghost sm" data-act="del" data-v="([^"]+)">/, '<button class="btn ghost sm" data-act="delCustom" data-v="$1">')).join('')}
+    <button class="card fu addm" data-act="addModel"><span style="font-size:30px;font-weight:200">+</span><span>${T('addModel')}</span><span class="small muted">${T('addModelD')}</span></button></div>`;
   const banner = !S.local.size ? recCard(true) : '';
-  return `<h2 class="fu">${T('tModels')}</h2><p class="sub fu" style="animation-delay:.08s;margin-bottom:20px">${T('modelsSub')}</p>${banner}${chips}${sections}`;
+  return `<h2 class="fu">${T('tModels')}</h2><p class="sub fu" style="animation-delay:.08s;margin-bottom:20px">${T('modelsSub')}</p>${banner}${chips}${cur === 'all' ? mineSec : ''}${sections}`;
 }
 function kimiCard() {
   const k = (S.st.apis || []).find(a => a.cloud === 'kimi');
@@ -216,7 +244,7 @@ function kimiCard() {
 }
 function recommend() {
   const order = ['qwen35-9b', 'gemma4-e4b', 'qwen25-coder-7b', 'llama32-3b', 'qwen25-3b'];
-  const list = order.map(id => CATALOG.find(m => m.id === id)).filter(Boolean).map(m => ({ m, p: plan(m) }));
+  const list = order.map(id => allModels().find(m => m.id === id)).filter(Boolean).map(m => ({ m, p: plan(m) }));
   return (list.find(x => x.p.fit === 2) || list.find(x => x.p.fit === 1) || list[list.length - 1]).m;
 }
 function recCard(compact) {
@@ -229,7 +257,7 @@ function recCard(compact) {
       : `<div class="row" style="justify-content:flex-start;gap:10px"><button class="btn sm" data-act="recDl" data-v="${m.id}">${T('recBtn')}</button>${compact ? '' : `<button class="btn ghost sm" data-act="toApp">${T('later')}</button>`}</div>`}</div>`;
 }
 async function downloadModel(id) {
-  const m = CATALOG.find(x => x.id === id); const p = plan(m);
+  const m = allModels().find(x => x.id === id); const p = plan(m);
   if (p.fit <= 0 && !confirm(T('warnHeavy'))) return;
   S.dl[id] = { got: 0, total: m.size * 1073741824 }; Sound.tick(1400); renderMain();
   const r = await P.download({ id, repos: m.repos, quant: m.quant || 'Q4_K_M' });
@@ -243,14 +271,14 @@ P.onProgress(({ id, got, total }) => {
   if (S.tab !== 'models') return;
   const bar = document.getElementById('pg-' + id), txt = document.getElementById('pt-' + id);
   if (bar) bar.style.width = (S.dl[id].total ? S.dl[id].got / S.dl[id].total * 100 : 0).toFixed(1) + '%';
-  if (txt) txt.textContent = dlText(S.dl[id], CATALOG.find(x => x.id === id));
+  if (txt) txt.textContent = dlText(S.dl[id], allModels().find(x => x.id === id));
 });
 async function runModel(id) { S.tab = 'chat'; renderNav(); renderMain(); return startModel(id); }
 async function startModel(id) {
-  const m = CATALOG.find(x => x.id === id); const p = plan(m);
+  const m = allModels().find(x => x.id === id); const p = plan(m);
   S.running = null; S.engine = { stage: 'load' };
   if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = engineText(); }
-  const r = await P.start({ id, ngl: p.ngl, ctx: p.ctx, threads: p.threads, gpu: p.ngl > 0, layers: m.layers, slots: p.slots, cpuMoe: p.cpuMoe });
+  const r = await P.start({ id, path: m.path, ngl: p.ngl, ctx: p.ctx, threads: p.threads, gpu: p.ngl > 0, layers: m.layers, slots: p.slots, cpuMoe: p.cpuMoe });
   if (!r.ok) { S.engine = { stage: 'error', error: r.error }; toast(T('eError') + ': ' + (r.error || '').slice(0, 300)); if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = engineText(); } return false; }
   S.running = id; S.slots = r.slots || 1; S.engine = { stage: 'ready', kind: r.kind }; if (!S.sel || S.sel === 'local') S.sel = 'local';
   renderNav(); if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = ''; const mp = $('#mpill'); if (mp) mp.textContent = m.name; } else renderMain();
@@ -265,7 +293,7 @@ function taskKind(t) {
   return 'general';
 }
 function pickModel(kind) {
-  const c = CATALOG.filter(m => S.local.has(m.id)).map(m => ({ m, p: plan(m) })).filter(x => x.p.fit >= 0);
+  const c = allModels().filter(m => S.local.has(m.id)).map(m => ({ m, p: plan(m) })).filter(x => x.p.fit >= 0);
   if (!c.length) return null;
   const score = x => (x.m.tags.includes(kind) ? 100 : x.m.tags.includes('general') ? 20 : 0) + x.p.fit * 10 + Math.min(x.p.speed, 60) / 6 + x.m.size;
   return c.sort((a, b) => score(b) - score(a))[0].m;
@@ -303,6 +331,8 @@ function viewOpt() {
     ['heat', T('oHeat'), T('oHeatD'), S.st.heat !== false ? `${T('on')} · ${S.st.heatLimit || 80}°` : T('off')],
     ['engine', T('oEngine'), T('oEngineD'), S.st.engine === 'cpu' ? 'CPU' : 'Vulkan'],
     ['sound', T('oSound'), T('oSoundD'), S.st.sound !== false ? T('on') : T('off')],
+    ['theme', T('oTheme'), T('oThemeD'), S.st.theme === 'light' ? T('light') : T('dark')],
+    ['tray', T('oTray'), T('oTrayD'), S.st.tray !== false ? T('on') : T('off')],
     ['lang', T('oLang'), '', L() === 'ru' ? 'Русский' : 'English']
   ];
   return `<h2 class="fu">${T('tOpt')}</h2><p class="sub fu" style="animation-delay:.08s">${T('optSub')}</p>
@@ -321,6 +351,8 @@ async function toggleOpt(k) {
   if (k === 'load') { await save({ load: S.st.load === false }); P.monitor(S.st.load !== false); }
   if (k === 'engine') await save({ engine: S.st.engine === 'cpu' ? 'vulkan' : 'cpu' });
   if (k === 'sound') await save({ sound: S.st.sound === false });
+  if (k === 'theme') { await save({ theme: S.st.theme === 'light' ? 'dark' : 'light' }); applyTheme(); }
+  if (k === 'tray') await save({ tray: S.st.tray === false });
   if (k === 'heat') { const seq = [[true, 80], [true, 75], [true, 85], [false, 80]]; const i = seq.findIndex(x => x[0] === (S.st.heat !== false) && x[1] === (S.st.heatLimit || 80)); const n = seq[(i + 1) % seq.length]; await save({ heat: n[0], heatLimit: n[1] }); }
   if (k === 'lang') { await save({ lang: L() === 'ru' ? 'en' : 'ru' }); renderNav(); }
   await save({ opt: o }); Sound.tick(1500); renderMain();
@@ -357,10 +389,33 @@ function viewApi() {
   </div>`;
 }
 
+// ---------- projects ----------
+async function loadProjects() {
+  let list = []; try { list = await P.ws.list('.'); } catch (e) {}
+  const found = [...new Set(list.filter(f => /^[^/]+\/index\.html$/i.test(f)).map(f => f.split('/')[0]))];
+  const known = S.st.projects || [];
+  const all = [...known.filter(p => found.includes(p.dir)), ...found.filter(d => !known.find(p => p.dir === d)).map(d => ({ dir: d, title: d, files: [d + '/index.html'], updated: 0 }))];
+  S.projects = all.sort((a, b) => (b.updated || 0) - (a.updated || 0));
+  const box = document.getElementById('projlist'); if (!box || S.tab !== 'projects') return;
+  box.innerHTML = S.projects.length ? S.projects.map((p, i) => `<div class="card fu" style="animation-delay:${.08 + i * .04}s;cursor:default">
+      <div class="row"><span style="font-size:20px;font-weight:400">${esc(p.title || p.dir)}</span><span class="mono small muted">${p.updated ? new Date(p.updated).toLocaleDateString() : ''}</span></div>
+      <div class="mono small muted">${esc(p.dir)}/ · ${p.files.length} ${T('filesN')}</div>
+      <div class="row" style="justify-content:flex-start;gap:6px;flex-wrap:wrap"><button class="cb pri" data-act="projOpen" data-v="${esc(p.files[0])}">${T('open')}</button><button class="cb" data-act="projEdit" data-v="${esc(p.files[0])}">${T('editor')}</button><button class="cb" data-act="projGo" data-v="${esc(p.dir)}">${T('projContinue')}</button><button class="cb" data-act="projFolder" data-v="${esc(p.dir)}">${T('folder')}</button></div></div>`).join('')
+    : `<div class="muted fu">${T('projEmpty')}</div>`;
+}
+function viewProjects() {
+  return `<h2 class="fu">${T('tProjects')}</h2><p class="sub fu" style="animation-delay:.08s">${T('projSub')}</p><div class="grid" id="projlist"></div>`;
+}
+async function rememberProject(dir, files, title) {
+  const list = (S.st.projects || []).filter(p => p.dir !== dir);
+  list.unshift({ dir, files, title: title || dir, updated: Date.now() });
+  await save({ projects: list.slice(0, 200) });
+}
+
 // ---------- chat ----------
 function sources() {
   const out = [];
-  if (S.running) { const m = CATALOG.find(x => x.id === S.running); out.push(['local', m ? m.name : S.running]); }
+  if (S.running) { const m = allModels().find(x => x.id === S.running); out.push(['local', m ? m.name : S.running]); }
   return out;
 }
 const ICON = {
@@ -381,11 +436,11 @@ let codeSeq = 0;
 const CODES = {};
 const RUNNABLE = { python: 'py', py: 'py', javascript: 'js', js: 'js', node: 'js', html: 'html' };
 function actLine(kind, arg, a) {
-  const label = { file: T('aFile'), run: T('aRun'), read: T('aRead'), list: T('aList'), open: T('aOpen'), search: T('aSearch') }[kind];
+  const label = { file: T('aFile'), run: T('aRun'), read: T('aRead'), list: T('aList'), open: T('aOpen'), search: T('aSearch'), click: T('aClick'), type: T('aType'), scroll: T('aScroll'), back: T('aBack') }[kind];
   let right = '';
   if (a) {
     const sm = { wait: T('sWait'), ask: T('sAsk'), work: T('sWork'), done: T('sDone'), denied: T('sDenied'), error: T('sError') };
-    if (a.state === 'ask') right = `<span><button class="cb pri" data-act="allow" data-v="${a.id}">${T('allow')}</button><button class="cb" data-act="deny" data-v="${a.id}">${T('deny')}</button></span>`;
+    if (a.state === 'ask') right = `<span>${a.site ? `<span class="small muted" style="margin-right:8px">${T('askSite')} ${esc(a.site)}?</span>` : ''}<button class="cb pri" data-act="allow" data-v="${a.id}">${T('allow')}</button><button class="cb" data-act="deny" data-v="${a.id}">${T('deny')}</button>${a.site ? `<button class="cb" data-act="allowAll" data-v="${a.id}">${T('allowAllReq')}</button>` : ''}</span>`;
     else if (a.state === 'done' && kind === 'file') right = `<span><button class="cb" data-act="fopen" data-v="${esc(arg)}">${T('open')}</button>${/\.(py|js|html?)$/i.test(arg) ? `<button class="cb pri" data-act="frun" data-v="${esc(arg)}">${T('run')}</button>` : ''}</span>`;
     else right = `<span class="st ${a.state === 'done' ? 'ok' : a.state === 'error' ? 'err' : ''}">${a.state === 'work' ? '<span class="shimmer">' + sm.work + '</span>' : sm[a.state] + (a.err ? ': ' + esc(a.err).slice(0, 80) : '')}</span>`;
   }
@@ -397,7 +452,7 @@ function md(s, ctx) {
   h = h.replace(/&lt;think&gt;([\s\S]*?)(&lt;\/think&gt;|$)/g, '<div class="think">$1</div>');
   h = h.replace(/```([^\n`]*)\n?([\s\S]*?)(```|$)/g, (_, lang, code, end) => {
     lang = lang.trim(); code = code.replace(/\n$/, '');
-    const m = lang.match(/^(file|run|read|list|open|search):(.*)$/);
+    const m = lang.match(/^(file|run|read|list|open|search|click|type|scroll|back):(.*)$/);
     if (m) {
       const a = ctx && ctx.acts && (!ctx.only || ctx.only.includes(m[1])) ? ctx.acts[ctx.k++] : null;
       if (m[1] !== 'file') return actLine(m[1], m[2].trim(), a);
@@ -417,7 +472,7 @@ function liveStatus(c) {
   if ((c.match(/```/g) || []).length % 2) {
     const lang = c.slice(c.lastIndexOf('```') + 3).split('\n')[0].trim();
     if (lang.startsWith('file:')) return T('stFile') + ' ' + lang.slice(5);
-    if (/^(run|read|list|open|search):/.test(lang)) return T('stAction');
+    if (/^(run|read|list|open|search|click|type|scroll|back):/.test(lang)) return T('stAction');
     return T('stCode');
   }
   return T('stWriting');
@@ -443,7 +498,8 @@ function viewChat() {
     <div class="fu" style="position:relative;width:120px;height:120px"><div class="ring"></div><div class="ring" style="animation-delay:1.06s"></div><div class="ring" style="animation-delay:2.13s"></div>
     <div class="led" style="position:absolute;top:50%;left:50%;width:6px;height:6px;margin:-3px;border-radius:3px;background:#fff"></div></div></div>`;
   return `<div class="chat">${head}<div class="msgs" id="msgs">${S.msgs.length ? S.msgs.map(msgHTML).join('') : empty}</div>
-    <div class="composer fu" style="animation-delay:.15s"><textarea id="input" rows="1" placeholder="${src.length ? T('placeholder') : T('chatNoModel')}"></textarea>
+    <div class="attachrow" id="attachrow"></div>
+    <div class="composer fu" style="animation-delay:.15s"><button class="ib attachb" data-act="attach" title="${T('attachT')}" aria-label="attach"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5 12.5 20a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg></button><textarea id="input" rows="1" placeholder="${src.length ? T('placeholder') : T('chatNoModel')}"></textarea>
     <button class="send" data-act="${S.streaming ? 'stop' : 'send'}" aria-label="send">${sendIcon()}</button></div></div>`;
 }
 const sendIcon = () => S.streaming ? '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect width="14" height="14" rx="3" fill="currentColor"/></svg>'
@@ -480,7 +536,7 @@ function msgInner(m) {
   return head + steps + fin + extra + askHTML(m.ask);
 }
 function msgHTML(m, i) {
-  if (m.role === 'user') return `<div class="msg me">${esc(m.content)}</div>`;
+  if (m.role === 'user') return `<div class="msg me">${esc(m.shown != null ? m.shown : m.content)}${(m.files || []).length ? `<div class="mfiles">${m.files.map(f => `<span class="achip">${esc(f.name)}</span>`).join('')}</div>` : ''}</div>`;
   if (m.role === 'tool') return `<div class="msg" data-i="${i}" style="display:none"></div>`;
   return `<div class="msg" data-i="${i}">${msgInner(m)}</div>`;
 }
@@ -555,7 +611,7 @@ function toApi(list) {
 // --- actions ---
 let actSeq = 0;
 function parseActions(text) {
-  const out = []; const re = /```(file|run|read|list|open|search):([^\n`]*)\n?([\s\S]*?)```/g; let m;
+  const out = []; const re = /```(file|run|read|list|open|search|click|type|scroll|back):([^\n`]*)\n?([\s\S]*?)```/g; let m;
   while ((m = re.exec(text))) out.push({ id: 'a' + (++actSeq), kind: m[1], arg: m[2].trim(), body: m[3].replace(/\n$/, ''), state: 'wait' });
   return out;
 }
@@ -564,6 +620,21 @@ function ask(a) { return new Promise(r => { S.pending[a.id] = r; }); }
 async function doSearch(q) {
   const res = await P.webSearch(q, S.st.searchKey || '');
   return res.length ? res.map((x, i) => `[${i + 1}] ${x.title} — ${x.url}\n${x.text}`).join('\n\n') : '(no results)';
+}
+const hostOf = u => { try { return new URL(u).host; } catch { return u; } };
+function siteAllowed(u) { return S.allowAll || (S.allowedHosts && S.allowedHosts.has(hostOf(u))); }
+async function askSiteAction(a, url, repaint) {
+  if (siteAllowed(url)) return true;
+  a.state = 'ask'; a.site = hostOf(url); repaint(); Sound.soft();
+  const ok = await ask(a); if (ok) (S.allowedHosts ||= new Set()).add(hostOf(url));
+  return ok;
+}
+async function askSite(msg, idx, url, label) {
+  if (siteAllowed(url)) return true;
+  const a = { id: 'a' + (++actSeq), site: true, title: label || T('askSite'), files: [hostOf(url)], state: 'ask' }; msg.ask = a; paint(idx); Sound.soft();
+  const ok = await new Promise(r => { S.pending[a.id] = r; });
+  msg.ask = null; paint(idx); if (ok) (S.allowedHosts ||= new Set()).add(hostOf(url));
+  return ok;
 }
 async function execAction(a, repaint, auto) {
   a.state = 'work'; repaint();
@@ -583,8 +654,16 @@ async function execAction(a, repaint, auto) {
     }
     else if (a.kind === 'read') res = `Content of ${a.arg}:\n${(await P.ws.read(a.arg)).slice(0, 8000)}`;
     else if (a.kind === 'list') { const l = await P.ws.list(a.arg || '.'); res = `Folder ${a.arg || '.'}:\n${l.join('\n') || '(empty)'}`; }
-    else if (a.kind === 'open') { const u = /^https?:\/\//i.test(a.arg) ? a.arg : 'https://' + a.arg; res = `Page ${u}:\n${await browse(u)}`; }
-    else if (a.kind === 'search') res = `Search results for "${a.arg}":\n${await doSearch(a.arg)}`;
+    else if (a.kind === 'open') {
+      const u = /^https?:\/\//i.test(a.arg) ? a.arg : 'https://' + a.arg;
+      if (!auto && !(await askSiteAction(a, u, repaint))) { a.state = 'denied'; repaint(); return `open:${u} — the user did not allow visiting this site.`; }
+      a.state = 'work'; repaint(); res = `Page ${u}:\n${await browse(u)}`;
+    }
+    else if (a.kind === 'search') {
+      if (!auto && !(await askSiteAction(a, 'https://duckduckgo.com', repaint))) { a.state = 'denied'; repaint(); return `search — the user did not allow searching the web.`; }
+      a.state = 'work'; repaint(); res = `Search results for "${a.arg}":\n${await doSearch(a.arg)}`;
+    }
+    else if (/^(click|type|scroll|back)$/.test(a.kind)) res = await browserAct(a, repaint);
     a.state = 'done'; repaint(); Sound.tick(1500);
     return res;
   } catch (e) {
@@ -623,7 +702,7 @@ async function autoFiles(msg, userText, agentId) {
   if (!save && !build) return [];
   const text = noThink(msg.content || '');
   const blocks = []; const re = /```([^\n`]*)\n([\s\S]*?)```/g; let m;
-  while ((m = re.exec(text))) { const lang = m[1].trim().toLowerCase(); if (/^(file|run|read|list|open|search):/.test(lang)) continue; if (m[2].trim().length > 20) blocks.push({ lang, code: m[2].replace(/\n$/, '') }); }
+  while ((m = re.exec(text))) { const lang = m[1].trim().toLowerCase(); if (/^(file|run|read|list|open|search|click|type|scroll|back):/.test(lang)) continue; if (m[2].trim().length > 20) blocks.push({ lang, code: m[2].replace(/\n$/, '') }); }
   const files = [];
   const html = blocks.find(b => b.lang === 'html' || /^\s*<!doctype html|<html[\s>]/i.test(b.code));
   if (html) {
@@ -699,13 +778,39 @@ function drawTabs() {
     <button class="bx" data-act="bclose" data-v="${t.id}" aria-label="close">${ico('x', 12)}</button></div>`).join('') +
     `<button class="ib sm" data-act="bnew" aria-label="new tab">${ico('plus', 14)}</button>`;
 }
+function layoutPanels() { const sc = root.querySelector('.screen'); if (sc) sc.classList.toggle('two', !!(S.panel && S.code)); }
+function openCode(tab) {
+  S.code = tab || S.code || 'edit';
+  document.getElementById('codepanel')?.classList.add('open');
+  document.querySelectorAll('.ctab').forEach(b => b.classList.toggle('on', b.dataset.v === S.code));
+  document.getElementById('cedit')?.classList.toggle('hidden', S.code !== 'edit');
+  document.getElementById('cout')?.classList.toggle('hidden', S.code !== 'out');
+  layoutPanels();
+}
+function closeCode() { S.code = null; document.getElementById('codepanel')?.classList.remove('open'); layoutPanels(); }
+let ED = null;
+function initEditor() {
+  const host = document.getElementById('cm'); if (!host || !window.PulsarEditor) return;
+  ED = PulsarEditor.create(host, { onSave: () => saveEditor(), onChange: () => { const st = document.getElementById('cstate'); if (st) st.textContent = '● ' + T('unsaved'); } });
+}
+async function openEditor(rel) {
+  let text = ''; try { text = await P.ws.read(rel); } catch (e) { toast(String(e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')); return; }
+  S.editFile = rel; if (ED) ED.set(text, rel);
+  document.getElementById('cfile').textContent = rel; document.getElementById('cstate').textContent = '';
+  openCode('edit');
+}
+async function saveEditor() {
+  if (!S.editFile || !ED) return;
+  await P.ws.write(S.editFile, ED.get()); document.getElementById('cstate').textContent = T('saved'); Sound.tick(1500);
+  if (/\.html?$/i.test(S.editFile)) { const u = await P.wsUrl(S.editFile); const t = B.tabs.find(x => x.url.split('#')[0] === u); if (t) t.wv.reload(); else browse(u, true); }
+}
 function openPanel() {
-  S.panel = true;
+  S.panel = true; setTimeout(layoutPanels);
   document.getElementById('panel')?.classList.add('open');
   root.querySelector('[data-act=panel]')?.classList.add('on');
   if (!B.tabs.length) newTab();
 }
-function closePanel() { S.panel = false; document.getElementById('panel')?.classList.remove('open'); root.querySelector('[data-act=panel]')?.classList.remove('on'); }
+function closePanel() { S.panel = false; layoutPanels(); document.getElementById('panel')?.classList.remove('open'); root.querySelector('[data-act=panel]')?.classList.remove('on'); }
 async function browse(url, show) {
   openPanel();
   let t = curTab();
@@ -716,8 +821,7 @@ async function browse(url, show) {
     const done = async () => {
       if (fin) return; fin = true; clearTimeout(timer); t.wv.removeEventListener('did-stop-loading', done);
       await new Promise(r => setTimeout(r, 600));
-      try { const txt = await t.wv.executeJavaScript('(document.title||"")+"\\n\\n"+(document.body?document.body.innerText:"")'); res(String(txt).replace(/\n{3,}/g, '\n\n').slice(0, 7000)); }
-      catch (e) { res('(could not read the page)'); }
+      res(await snapshot(t));
     };
     const timer = setTimeout(done, 25000);
     t.wv.addEventListener('did-stop-loading', done);
@@ -725,6 +829,38 @@ async function browse(url, show) {
   });
 }
 
+// --- the agent controls the built-in browser: click, type, scroll, back ---
+const SNAP_JS = `(()=>{document.querySelectorAll('[data-pid]').forEach(e=>e.removeAttribute('data-pid'));let n=0;const out=[];
+ const els=[...document.querySelectorAll('a[href],button,input,textarea,select,[role=button],[role=link],[onclick],summary')].filter(e=>{const r=e.getBoundingClientRect();const st=getComputedStyle(e);return r.width>2&&r.height>2&&st.visibility!=='hidden'&&st.display!=='none'&&!e.disabled});
+ for(const e of els.slice(0,80)){n++;e.setAttribute('data-pid',n);const t=(e.innerText||e.value||e.placeholder||e.getAttribute('aria-label')||e.title||e.name||'').trim().replace(/\\s+/g,' ').slice(0,60);out.push('['+n+'] '+e.tagName.toLowerCase()+(e.type&&e.tagName!=='BUTTON'?'('+e.type+')':'')+' '+JSON.stringify(t));}
+ return JSON.stringify({url:location.href,title:document.title,elements:out,text:(document.body?document.body.innerText:'').replace(/\\n{3,}/g,'\\n\\n').slice(0,5000)});})()`;
+async function snapshot(t) {
+  try { const j = JSON.parse(await t.wv.executeJavaScript(SNAP_JS)); return `URL: ${j.url}\nTitle: ${j.title}\n\n${j.text}\n\nInteractive elements (use click:N or type:N|text):\n${j.elements.join('\n')}`; }
+  catch (e) { return '(could not read the page)'; }
+}
+function waitLoad(t, ms) {
+  return new Promise(res => { let done = false; const fin = () => { if (done) return; done = true; t.wv.removeEventListener('did-stop-loading', fin); setTimeout(res, 500); }; t.wv.addEventListener('did-stop-loading', fin); setTimeout(fin, ms || 2500); });
+}
+async function browserAct(a, repaint) {
+  const t = curTab(); if (!t || t.url === START) throw new Error('no page is open — use open: first');
+  const before = t.url;
+  if (a.kind === 'click') {
+    const r = await t.wv.executeJavaScript(`(()=>{const e=document.querySelector('[data-pid="${parseInt(a.arg)}"]');if(!e)return 'missing';e.scrollIntoView({block:'center'});e.click();return 'ok'})()`);
+    if (r !== 'ok') throw new Error('element ' + a.arg + ' not found — take a fresh look at the page');
+    await waitLoad(t, 2500);
+  } else if (a.kind === 'type') {
+    const [n, ...rest] = a.arg.split('|'); let text = rest.join('|'); const submit = /(\\n|⏎|\{enter\})$/i.test(text) || /\n$/.test(a.body || ''); text = text.replace(/(\\n|⏎|\{enter\})$/i, '');
+    const r = await t.wv.executeJavaScript(`(()=>{const e=document.querySelector('[data-pid="${parseInt(n)}"]');if(!e)return 'missing';e.focus();const p=Object.getPrototypeOf(e);const d=Object.getOwnPropertyDescriptor(p,'value');d&&d.set?d.set.call(e,${JSON.stringify(text)}):(e.value=${JSON.stringify(text)});e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));
+      if(${submit}){e.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,bubbles:true}));if(e.form){e.form.requestSubmit?e.form.requestSubmit():e.form.submit()}}return 'ok'})()`);
+    if (r !== 'ok') throw new Error('field ' + n + ' not found');
+    await waitLoad(t, submit ? 3000 : 400);
+  } else if (a.kind === 'scroll') {
+    await t.wv.executeJavaScript(`window.scrollBy({top:${/up/i.test(a.arg) ? -1 : 1}*innerHeight*0.8,behavior:'smooth'})`); await new Promise(r => setTimeout(r, 600));
+  } else if (a.kind === 'back') { if (t.wv.canGoBack()) { t.wv.goBack(); await waitLoad(t, 2500); } }
+  if (hostOf(t.url) !== hostOf(before) && !(await askSiteAction(a, t.url, repaint))) { if (t.wv.canGoBack()) t.wv.goBack(); a.state = 'denied'; repaint(); return `The page moved to ${hostOf(t.url)}, the user did not allow reading it. Went back.`; }
+  a.state = 'work'; repaint();
+  return `After ${a.kind}:${a.arg}\n${await snapshot(t)}`;
+}
 // --- output drawer (only opens on Run) ---
 function showOut(title, text, code) {
   const d = document.getElementById('drawer'); if (!d) return;
@@ -742,9 +878,9 @@ async function runFile(rel, title) {
   const d = document.getElementById('drawer'); const out = document.getElementById('out');
   document.getElementById('dtitle').textContent = title || rel;
   const dc = document.getElementById('dcode'); dc.textContent = '● ' + T('running'); dc.className = 'mono small';
-  out.textContent = ''; d.classList.add('open'); setRunInput(true);
+  out.textContent = ''; openCode('out'); setRunInput(true);
   const r = await P.runStart(id, rel).catch(err => ({ error: String(err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '') }));
-  if (r.preview) { d.classList.remove('open'); S.runId = null; browse(r.preview, true); return; }
+  if (r.preview) { S.runId = null; browse(r.preview, true); return; }
   if (r.error || !r.ok) { out.textContent = r.noPython ? T('noPython') : (r.error || 'error'); dc.textContent = '● -1'; dc.className = 'mono small err'; setRunInput(false); S.runId = null; }
   else setTimeout(() => document.getElementById('runin')?.focus(), 100);
 }
@@ -790,6 +926,7 @@ async function askSave(msg, idx, paths) {
 }
 function askHTML(a) {
   if (!a || a.state === 'done') return '';
+  if (a.site) return `<div class="act askcard"><div class="row" style="gap:12px"><span>${esc(a.title)} <span class="mono">${esc(a.files[0])}</span>?</span><span><button class="cb pri" data-act="allow" data-v="${a.id}">${T('allow')}</button><button class="cb" data-act="deny" data-v="${a.id}">${T('deny')}</button><button class="cb" data-act="allowAll" data-v="${a.id}">${T('allowAllReq')}</button></span></div></div>`;
   const right = a.state === 'ask' ? `<span><button class="cb pri" data-act="allow" data-v="${a.id}">${T('allow')}</button><button class="cb" data-act="deny" data-v="${a.id}">${T('deny')}</button></span>`
     : `<span class="st ${a.state === 'done' ? 'ok' : ''}">${a.state === 'done' ? T('saved') : T('sDenied')}</span>`;
   return `<div class="act askcard"><div class="row" style="gap:12px"><span>${T('saveToPc')} · ${a.files.length}</span>${right}</div><div style="margin-top:8px;display:flex;flex-direction:column;gap:3px;color:#999">${a.files.map(f => `<span class="mono small">${esc(f)}</span>`).join('')}</div></div>`;
@@ -836,7 +973,7 @@ function chainPlan(text) {
   const build = BUILD_RE.test(text) || (urls.length > 0 && (like || /(сделай|делай|создай|напиши|make|build)/i.test(text)));
   const site = urls.length > 0 || /(сайт|страниц|лендинг|site|page|landing|html)/i.test(text);
   const edit = !urls.length && !!S.lastProject && /(переделай|измени|исправь|добавь|доработай|улучши|поменяй|убери|замени|сделай (его|её|ее|сайт|страниц|кнопк|фон|шрифт|текст)|change|fix|add|remove|improve|make it)/i.test(text) && !/(нов(ый|ую)|another|new)\s*(сайт|site|программ)/i.test(text);
-  return { urls, build: build || edit, edit, site: edit ? S.lastProject.site : site, multi: site && MULTI_RE.test(text), research: !urls.length && !edit && build && SEARCH_RE.test(text) };
+  return { urls, build: build || edit, edit, refs: site && !urls.length && !edit && (build || edit) && S.st.refs !== false, site: edit ? S.lastProject.site : site, multi: site && MULTI_RE.test(text), research: !urls.length && !edit && build && SEARCH_RE.test(text) };
 }
 async function limitAll(items, n, fn) {
   const out = new Array(items.length); let i = 0;
@@ -847,7 +984,7 @@ function lastCode(s, wantHtml) {
   const re = /```([^\n`]*)\n([\s\S]*?)(```|$)/g; let m, best = null;
   while ((m = re.exec(noThink(s || '')))) {
     let l = m[1].trim().toLowerCase(); if (m[2].trim().length < 30) continue;
-    if (l.startsWith('file:')) l = l.split('.').pop(); else if (/^(run|read|list|open|search):/.test(l)) continue;
+    if (l.startsWith('file:')) l = l.split('.').pop(); else if (/^(run|read|list|open|search|click|type|scroll|back):/.test(l)) continue;
     const isHtml = l === 'html' || /^\s*(<!doctype html|<html)/i.test(m[2]);
     if (!wantHtml || isHtml) best = { lang: isHtml ? 'html' : l, code: m[2].replace(/\n$/, ''), closed: !!m[3] };
   }
@@ -881,7 +1018,7 @@ function extractCode(s, wantHtml) {
   const text = noThink(s || '');
   const blocks = []; const re = /```([^\n`]*)\n([\s\S]*?)(```|$)/g; let m;
   while ((m = re.exec(text))) {
-    let l = m[1].trim().toLowerCase(); if (/^(run|read|list|open|search):/.test(l)) continue;
+    let l = m[1].trim().toLowerCase(); if (/^(run|read|list|open|search|click|type|scroll|back):/.test(l)) continue;
     if (l.startsWith('file:')) l = l.split('.').pop();
     if (m[2].trim().length > 20) blocks.push({ lang: l, code: m[2].replace(/\n$/, ''), closed: !!m[3] });
   }
@@ -922,7 +1059,7 @@ function progName(c, text) {
 async function runChain(text, signal, plan) {
   const lang = L() === 'ru' ? 'Russian' : 'English';
   const def = id => ourAgents().find(x => x[0] === id);
-  const ids = ['accept', (plan.urls.length || plan.research) && 'analyze', plan.multi && !plan.edit && 'plan', 'code', 'review', 'save'].filter(Boolean);
+  const ids = ['accept', (plan.urls.length || plan.research || plan.refs) && 'analyze', plan.multi && !plan.edit && 'plan', 'code', 'review', 'save'].filter(Boolean);
   const msg = { role: 'assistant', content: '', parts: [], chain: { stages: ids.map(id => ({ id, state: 'wait' })) } }; S.msgs.push(msg); const idx = S.msgs.length - 1; addMsg(idx);
   const stage = id => { let seen = false; for (const st of msg.chain.stages) { if (st.id === id) { st.state = 'work'; seen = true; } else if (!seen) st.state = 'done'; } paint(idx); };
   const finish = () => { msg.chain.stages.forEach(st => st.state = 'done'); paint(idx); };
@@ -932,22 +1069,32 @@ async function runChain(text, signal, plan) {
   let brief = '';
   const browser = def('browser'), coder = def('coder');
   // 1. look at the examples / research
+  if (plan.refs && !plan.urls.length) {
+    stage('analyze');
+    if (await askSite(msg, idx, 'https://duckduckgo.com', T('askSearchRefs'))) {
+      const res = await P.webSearch(text.slice(0, 100) + (L() === 'ru' ? ' сайт' : ' website'), S.st.searchKey || '');
+      plan.urls = res.map(r => r.url).filter(u => /^https?:/.test(u) && !/duckduckgo|youtube|wikipedia|facebook|instagram|vk\.com|pinterest|reddit|tiktok/i.test(u)).slice(0, 2);
+      plan.refsFound = true;
+    }
+  }
   if (plan.urls.length) {
     stage('analyze'); await waitCool();
     const p = part(browser[1], T('chAnalyze'));
     const raw = [];
     for (const u of plan.urls) {
       if (signal.aborted) return;
+      if (!(await askSite(msg, idx, u))) continue;
       p.task = T('chAnalyze') + ' · ' + u; paint(idx);
       await browse(u);
       let st = ''; try { st = await curTab().wv.executeJavaScript(PAGE_JS); } catch (e) {}
       raw.push(`URL: ${u}\n${st}`);
     }
     p.task = T('chAnalyze');
+    if (!raw.length) { p.status = 'done'; p.content = '-'; paint(idx); } else
     await stream([{ role: 'system', content: browser[3] + ` Analyze the example websites for a web designer who must recreate the style: 1) sections in order, 2) colors (hex), fonts, sizes, corner radius, 3) mood and visual effects, animations, 4) key texts. Be concrete, use short lists. Answer in ${lang}.` },
       { role: 'user', content: `User request: ${text}\n\nPage data:\n${raw.join('\n\n').slice(0, 12000)}` }], signal, c => { p.content += c; paint(idx); });
-    brief = noThink(p.content); p.status = 'done'; paint(idx);
-  } else if (plan.research) {
+    if (raw.length) { brief = noThink(p.content); p.status = 'done'; paint(idx); }
+  } else if (plan.research && await askSite(msg, idx, 'https://duckduckgo.com', T('askSearch'))) {
     stage('analyze'); await waitCool();
     const p = part(browser[1], T('chResearch'));
     const res = await doSearch(text.slice(0, 120));
@@ -1038,6 +1185,7 @@ async function runChain(text, signal, plan) {
     for (const f of files) await P.ws.write(f.path, f.code);
     msg.extra = files.map(f => ({ id: 'a' + (++actSeq), kind: 'file', arg: f.path, state: 'done' }));
     S.lastProject = { dir, site: plan.site, files: proj ? proj.files : files.map(f => f.path) };
+    if (plan.site) rememberProject(dir, S.lastProject.files, ((files[0].code.match(/<title>([^<]*)<\/title>/i) || [])[1] || dir).trim()).catch(() => {});
     finish();
     msg.content = proj ? T('chEdited')(files.length) : plan.site ? T('chDoneSite')(pages.filter((pg, k) => codes[k]).length, dir) : T('chDone')(files.length);
     paint(idx); Sound.done();
@@ -1049,7 +1197,7 @@ async function saveChat() {
   if (!S.chatId) S.chatId = 'c' + Date.now();
   const first = S.msgs.find(m => m.role === 'user');
   const msgs = JSON.parse(JSON.stringify(S.msgs, (k, v) => k === 'live' ? undefined : v));
-  await P.chats.save({ id: S.chatId, title: (first ? first.content : '…').replace(/\s+/g, ' ').slice(0, 60), msgs, lastProject: S.lastProject || null });
+  await P.chats.save({ id: S.chatId, title: (first ? (first.shown || first.content) : '…').replace(/\s+/g, ' ').slice(0, 60), msgs, lastProject: S.lastProject || null });
   S.chats = await P.chats.list(); renderNav();
 }
 async function openChat(id) {
@@ -1058,16 +1206,34 @@ async function openChat(id) {
   S.chatId = id; S.msgs = c.msgs || []; S.lastProject = c.lastProject || null;
   S.tab = 'chat'; S._lastTab = null; renderNav(); renderMain();
 }
+S.attach = [];
+function addAttach(list) {
+  for (const f of list || []) { if (f.error) toast(`${f.name}: ${f.error}`); else if (S.attach.length < 6) S.attach.push(f); }
+  drawAttach();
+}
+function drawAttach() {
+  const el = document.getElementById('attachrow'); if (!el) return;
+  el.innerHTML = S.attach.map((f, i) => `<span class="achip">${esc(f.name)}<span class="mono">${(f.size / 1024).toFixed(0)} KB</span><button class="bx" data-act="unattach" data-v="${i}" aria-label="remove">${ico('x', 10)}</button></span>`).join('');
+}
+document.addEventListener('dragover', e => { if (e.target.closest && e.target.closest('.chat')) { e.preventDefault(); } });
+document.addEventListener('drop', async e => {
+  if (!(e.target.closest && e.target.closest('.chat'))) return; e.preventDefault();
+  const paths = [...(e.dataTransfer.files || [])].map(f => P.pathForFile(f)).filter(Boolean);
+  if (paths.length) addAttach(await P.readFiles(paths));
+});
 function lockComposer(on) {
   const ta = $('#input'); if (!ta) return;
   ta.disabled = on; ta.placeholder = on ? T('agentsWorking') : T('placeholder');
 }
 async function sendMsg() {
-  const ta = $('#input'); const text = ta.value.trim(); if (!text || S.streaming) return;
-  const url = openIntent(text);
+  const ta = $('#input'); const typed = ta.value.trim(); if ((!typed && !S.attach.length) || S.streaming) return;
+  const files = S.attach.splice(0); drawAttach();
+  const text = (typed || T('attachAsk')) + files.map(f => `\n\n[Attached file: ${f.name}${f.cut ? ' (cut)' : ''}]\n\`\`\`\n${f.text}\n\`\`\``).join('');
+  S.allowAll = false; S.allowedHosts = new Set();
+  const url = files.length ? null : openIntent(typed);
   if (!S.running && !url) { toast(T('chatNoModel')); return; }
   ta.value = ''; ta.style.height = 'auto';
-  S.msgs.push({ role: 'user', content: text }); addMsg(S.msgs.length - 1);
+  S.msgs.push({ role: 'user', content: text, shown: typed, files: files.map(f => ({ name: f.name, size: f.size })) }); addMsg(S.msgs.length - 1);
   const ctl = new AbortController(); S.streaming = ctl; setSendBtn(); lockComposer(true); Sound.soft();
   const auto = S.st.autoAgent !== false;
   const ag = auto ? pickAgent(text) : curAgentDef();
@@ -1084,14 +1250,14 @@ async function sendMsg() {
     else if (url) {
       const m = { role: 'assistant', content: '', extra: [{ id: 'a' + (++actSeq), kind: 'open', arg: url, state: 'wait' }] };
       S.msgs.push(m); const i = S.msgs.length - 1; addMsg(i);
-      const res = await execAction(m.extra[0], () => paint(i));
+      const res = await execAction(m.extra[0], () => paint(i), true);
       const rest = text.replace(/(открой|открыть|зайди|перейди|open|go to)[^,.;]*/i, '').trim();
       if (S.running && rest.split(/\s+/).length >= 3) { S.msgs.push({ role: 'tool', content: res }); addMsg(S.msgs.length - 1); await runAgent(ag, text, ctl.signal); }
     } else {
       if (ag.id === 'browser' && !SAVE_RE.test(text)) {
         const m = { role: 'assistant', content: '', extra: [{ id: 'a' + (++actSeq), kind: 'search', arg: text.slice(0, 120), state: 'wait' }] };
         S.msgs.push(m); const i = S.msgs.length - 1; addMsg(i);
-        const res = await execAction(m.extra[0], () => paint(i));
+        const res = await execAction(m.extra[0], () => paint(i), false);
         S.msgs.push({ role: 'tool', content: res + '\nUse these results, cite links. You may open a link with an open: block to read more.' }); addMsg(S.msgs.length - 1);
       }
       await runAgent(ag, text, ctl.signal);
@@ -1102,6 +1268,7 @@ async function sendMsg() {
   Object.values(S.pending).forEach(r => r(false)); S.pending = {};
   S.streaming = null; setSendBtn(); lockComposer(false); Sound.done(); $('#input')?.focus();
   saveChat().catch(() => {});
+  P.notify('PULSAR', T('notifyDone')).catch(() => {});
 }
 
 // ---------- events ----------
@@ -1164,7 +1331,20 @@ root.addEventListener('click', async e => {
     case 'wvFwd': curTab()?.wv.goForward(); break;
     case 'wvReload': curTab()?.wv.reload(); break;
     case 'wvExt': { const t = curTab(); if (t && t.url !== START) P.openExternal(t.url); break; }
-    case 'dclose': document.getElementById('drawer').classList.remove('open'); if (S.runId) { P.runKill(S.runId); S.runId = null; } break;
+    case 'cclose': closeCode(); if (S.runId) { P.runKill(S.runId); S.runId = null; } break;
+    case 'ctab': openCode(v); break;
+    case 'csave': saveEditor(); break;
+    case 'crun': if (S.editFile) { await saveEditor(); runFile(S.editFile); } break;
+    case 'cext': if (S.editFile) P.ws.openFile(S.editFile); break;
+    case 'attach': { const f = await P.pickFiles(); addAttach(f); break; }
+    case 'unattach': S.attach.splice(+v, 1); drawAttach(); break;
+    case 'allowAll': { S.allowAll = true; const r = S.pending[v]; delete S.pending[v]; r && r(true); break; }
+    case 'addModel': { const m = await P.pickModel(); if (m) { const id = 'custom-' + (slug(m.name) || Date.now()); await save({ customModels: [...(S.st.customModels || []).filter(x => x.id !== id), { id, name: m.name, path: m.path, sizeGB: m.sizeGB }] }); S.local.add(id); Sound.done(); renderMain(); } break; }
+    case 'delCustom': await save({ customModels: (S.st.customModels || []).filter(x => x.id !== v) }); S.local.delete(v); if (S.running === v) { await P.stop(); S.running = null; } renderNav(); renderMain(); break;
+    case 'projOpen': { const r = await P.ws.run(v).catch(() => null); if (r && r.preview) browse(r.preview, true); break; }
+    case 'projEdit': openEditor(v); break;
+    case 'projFolder': P.ws.openFile(v); break;
+    case 'projGo': { const pr = (S.projects || []).find(p => p.dir === v); if (pr) { S.msgs = []; S.chatId = null; S.lastProject = { dir: pr.dir, site: true, files: pr.files }; S.tab = 'chat'; S._lastTab = null; renderNav(); renderMain(); toast(T('projCont')(pr.dir)); } break; }
     case 'runSend': sendRunInput(); break;
     case 'drerun': if (S.lastRun) runFile(S.lastRun); break;
     case 'copy': navigator.clipboard.writeText(CODES[v].code); toast(T('copied')); break;
@@ -1173,7 +1353,7 @@ root.addEventListener('click', async e => {
       const c = CODES[v]; const ext = RUNNABLE[c.lang.toLowerCase()]; const rel = `.pulsar/snippet.${ext}`;
       await P.ws.write(rel, c.code); runFile(rel, c.lang); break;
     }
-    case 'fopen': P.ws.openFile(v); break;
+    case 'fopen': openEditor(v); break;
     case 'frun': runFile(v); break;
   }
 });
@@ -1207,7 +1387,7 @@ P.onTemps(t => {
   if (!t.hot && was) toast(T('coolToast'));
   if (t.max >= (t.limit || 80) + 10 && S.streaming) { S.streaming.abort(); toast(T('tooHot')(Math.round(t.max))); }
 });
-P.onUpdate(u => { S.update = { ...(S.update || {}), ...u }; if ($('#nav')) renderNav(); if (u.state === 'ready') toast(T('updReady')(u.version)); });
+P.onUpdate(u => { S.update = { ...(S.update || {}), ...u }; const ub = document.getElementById('updbar'); if (ub && u.percent != null) ub.style.width = u.percent + '%'; if ($('#nav')) renderNav(); if (u.state === 'ready') toast(T('updReady')(u.version)); });
 P.onLoad(l => {
   const was = S.busy; S.busy = l.busy ? l.name : null;
   if (S.busy && S.busy !== was && S.running) toast(T('busy')(S.busy));
@@ -1215,9 +1395,10 @@ P.onLoad(l => {
 
 window.addEventListener('error', e => P.log(`UI error: ${e.message} @ ${e.filename}:${e.lineno}`));
 window.addEventListener('unhandledrejection', e => P.log(`UI promise: ${e.reason && (e.reason.stack || e.reason.message) || e.reason}`));
+function applyTheme() { document.documentElement.classList.toggle('light', S.st.theme === 'light'); }
 // ---------- boot ----------
 (async () => {
-  S.st = await P.getSettings();
+  S.st = await P.getSettings(); applyTheme();
   if (S.st.apis) await save({ apis: [] });
   if (S.st.agent === 'team' || !['coder', 'files', 'browser'].includes(S.st.agent || 'coder')) await save({ agent: 'coder' });
   if (S.st.lang) document.documentElement.lang = S.st.lang;

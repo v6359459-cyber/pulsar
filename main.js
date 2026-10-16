@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, Tray, Menu, Notification, nativeImage } = require('electron');
 const { pathToFileURL } = require('url');
 const path = require('path');
 const fs = require('fs');
@@ -173,7 +173,7 @@ async function waitHealth(proc, ms) {
 }
 async function launch(kind, opts) {
   const exe = await ensureEngine(kind);
-  const args = ['-m', path.join(DIRS().models, opts.id + '.gguf'), '--host', '127.0.0.1', '--port', String(PORT),
+  const args = ['-m', opts.path || path.join(DIRS().models, opts.id + '.gguf'), '--host', '127.0.0.1', '--port', String(PORT),
     '-c', String(opts.ctx || 4096), '-t', String(opts.threads || 4), '--jinja'];
   args.push('-ngl', String(kind === 'vulkan' ? (opts.ngl ?? 999) : 0));
   if (opts.slots > 1) { args.push('-np', String(opts.slots)); args[args.indexOf('-c') + 1] = String((opts.ctx || 4096) * opts.slots); }
@@ -299,7 +299,8 @@ ipcMain.handle('ws:saveAs', async (_e, { name, content }) => {
 });
 function runners(f) {
   const ext = path.extname(f).toLowerCase(); const winOS = process.platform === 'win32';
-  if (ext === '.py') return winOS ? [['py', ['-3', f]], ['python', [f]]] : [['python3', [f]], ['python', [f]]];
+  const bp = [path.join(process.resourcesPath || '', 'engine', 'python', 'python.exe'), path.join(__dirname, 'engine', 'python', 'python.exe')].find(p => { try { return fs.existsSync(p); } catch { return false; } });
+  if (ext === '.py') return [...(bp ? [[bp, [f]]] : []), ...(winOS ? [['py', ['-3', f]], ['python', [f]]] : [['python3', [f]], ['python', [f]]])];
   if (ext === '.js' || ext === '.mjs') return [[process.execPath, [f], { ELECTRON_RUN_AS_NODE: '1' }]];
   if (ext === '.bat' || ext === '.cmd') return winOS ? [['cmd.exe', ['/c', f]]] : null;
   return null;
@@ -505,10 +506,18 @@ app.whenReady().then(() => {
   autoUpdater.on('download-progress', p => send('update', { state: 'downloading', percent: Math.round(p.percent) }));
   autoUpdater.on('update-downloaded', i => send('update', { state: 'ready', version: i.version }));
   autoUpdater.on('error', e => { try { fs.appendFileSync(path.join(DATA(), 'app.log'), `[update] ${e.message}\n`); } catch {} });
-  const check = () => autoUpdater.checkForUpdates().catch(() => {});
-  setTimeout(check, 8000); setInterval(check, 6 * 3600 * 1000);
+  setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 3600 * 1000);
 });
-ipcMain.handle('update:install', () => { if (autoUpdater) { stopServer(); autoUpdater.quitAndInstall(false, true); } });
+ipcMain.handle('update:install', () => { if (autoUpdater) { stopServer(); app.isQuitting = true; autoUpdater.quitAndInstall(true, true); } });
+ipcMain.handle('update:check', async () => {
+  if (!autoUpdater || !app.isPackaged) return { available: false };
+  try {
+    const r = await Promise.race([autoUpdater.checkForUpdates(), new Promise(res => setTimeout(() => res(null), 8000))]);
+    const v = r && r.updateInfo && r.updateInfo.version;
+    const newer = v && v.localeCompare(app.getVersion(), undefined, { numeric: true }) > 0;
+    return { available: !!newer, version: v };
+  } catch (e) { return { available: false, error: e.message }; }
+});
 ipcMain.handle('app:version', () => app.getVersion());
 
 // ---------- interactive run: live output + keyboard input for programs with input() ----------
@@ -540,3 +549,60 @@ ipcMain.handle('run:start', async (_e, { id, rel }) => {
 ipcMain.handle('run:input', (_e, { id, line }) => { const p = procs[id]; if (p && p.stdin.writable) p.stdin.write(line + '\n'); return !!p; });
 ipcMain.handle('run:kill', (_e, id) => { const p = procs[id]; if (p) { try { p.kill(); } catch {} delete procs[id]; } return true; });
 app.on('before-quit', () => { for (const p of Object.values(procs)) { try { p.kill(); } catch {} } });
+
+
+// ---------- attach files: read text from txt/code/csv/json/pdf/docx ----------
+const TEXT_EXT = /\.(txt|md|csv|tsv|json|js|mjs|ts|py|html?|css|xml|yml|yaml|log|ini|bat|ps1|sql|java|c|cpp|h|cs|go|rs|php|rb|kt|swift|sh)$/i;
+async function readAny(p) {
+  const name = path.basename(p); const st = fs.statSync(p);
+  if (st.size > 25 * 1048576) throw new Error('file is larger than 25 MB');
+  let text = '';
+  if (/\.pdf$/i.test(p)) { const { PDFParse } = require('pdf-parse'); const parser = new PDFParse({ data: fs.readFileSync(p) }); text = (await parser.getText()).text; await parser.destroy?.(); }
+  else if (/\.docx$/i.test(p)) { text = (await require('mammoth').extractRawText({ path: p })).value; }
+  else if (TEXT_EXT.test(p)) text = fs.readFileSync(p, 'utf8');
+  else throw new Error('unsupported file type');
+  return { name, size: st.size, text: text.slice(0, 60000), cut: text.length > 60000 };
+}
+ipcMain.handle('file:pick', async () => {
+  const r = await dialog.showOpenDialog(win, { properties: ['openFile', 'multiSelections'], filters: [{ name: 'Documents', extensions: ['txt', 'md', 'csv', 'json', 'pdf', 'docx', 'html', 'css', 'js', 'py', 'xml', 'log', 'ts', 'sql'] }, { name: 'All', extensions: ['*'] }] });
+  if (r.canceled) return [];
+  const out = []; for (const p of r.filePaths.slice(0, 6)) { try { out.push(await readAny(p)); } catch (e) { out.push({ name: path.basename(p), error: e.message }); } }
+  return out;
+});
+ipcMain.handle('file:read', async (_e, paths) => { const out = []; for (const p of (paths || []).slice(0, 6)) { try { out.push(await readAny(p)); } catch (e) { out.push({ name: path.basename(p), error: e.message }); } } return out; });
+
+// ---------- your own model from disk ----------
+ipcMain.handle('model:pickLocal', async () => {
+  const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: [{ name: 'GGUF model', extensions: ['gguf'] }] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  const p = r.filePaths[0]; return { path: p, name: path.basename(p, '.gguf'), sizeGB: +(fs.statSync(p).size / 1073741824).toFixed(1) };
+});
+
+// ---------- tray + background work + notifications ----------
+let tray = null, trayHinted = false;
+app.whenReady().then(() => {
+  try {
+    tray = new Tray(nativeImage.createFromPath(path.join(__dirname, 'build', 'icon.png')).resize({ width: 16, height: 16 }));
+    tray.setToolTip('PULSAR');
+    tray.setContextMenu(Menu.buildFromTemplate([{ label: 'PULSAR', click: () => { win.show(); win.focus(); } }, { type: 'separator' }, { label: 'Quit / Выход', click: () => { app.isQuitting = true; stopServer(); app.quit(); } }]));
+    tray.on('click', () => { win.show(); win.focus(); });
+  } catch {}
+});
+app.on('browser-window-created', (_e, w) => {
+  if (w !== win && win) return;
+  setTimeout(() => {
+    if (!win || win.__trayHooked) return; win.__trayHooked = true;
+    win.on('close', ev => {
+      if (app.isQuitting || readSettings().tray === false || !tray) return;
+      ev.preventDefault(); win.hide();
+      if (!trayHinted) { trayHinted = true; try { new Notification({ title: 'PULSAR', body: readSettings().lang === 'en' ? 'PULSAR keeps working in the background. Right-click the tray icon to quit.' : 'PULSAR продолжает работать в фоне. Выйти — правый клик по значку в трее.' }).show(); } catch {} }
+    });
+  }, 100);
+});
+app.on('before-quit', () => { app.isQuitting = true; });
+ipcMain.handle('notify', (_e, { title, body }) => {
+  if (win && win.isVisible() && win.isFocused()) return false;
+  try { const n = new Notification({ title, body, icon: path.join(__dirname, 'build', 'icon.png') }); n.on('click', () => { win.show(); win.focus(); }); n.show(); } catch {}
+  return true;
+});
+ipcMain.handle('ws:abs', (_e, rel) => pathToFileURL(wsPath(rel)).href);

@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 const on = ch => cb => { const f = (_e, d) => cb(d); ipcRenderer.on(ch, f); return () => ipcRenderer.removeListener(ch, f); };
 contextBridge.exposeInMainWorld('pulsar', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
@@ -43,6 +43,13 @@ contextBridge.exposeInMainWorld('pulsar', {
   runKill: id => ipcRenderer.invoke('run:kill', id),
   onRunOut: on('run:out'),
   onRunExit: on('run:exit'),
+  pickFiles: () => ipcRenderer.invoke('file:pick'),
+  readFiles: paths => ipcRenderer.invoke('file:read', paths),
+  pathForFile: f => { try { return webUtils.getPathForFile(f); } catch { return ''; } },
+  pickModel: () => ipcRenderer.invoke('model:pickLocal'),
+  notify: (title, body) => ipcRenderer.invoke('notify', { title, body }),
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
+  wsUrl: rel => ipcRenderer.invoke('ws:abs', rel),
   checkHtml: c => ipcRenderer.invoke('check:html', c),
   checkCode: (lang, code) => ipcRenderer.invoke('check:code', { lang, code })
 });
