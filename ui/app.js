@@ -150,7 +150,11 @@ function langScreen() {
 }
 function applyT(el) { el.querySelectorAll('[data-t]').forEach(n => { n.innerHTML = T(n.dataset.t); }); }
 let introTimer;
+// the update check starts together with the intro, so by its end the answer is usually ready
+let updCheck = null;
+const startUpdCheck = () => updCheck || (updCheck = Promise.race([P.checkUpdate().catch(() => ({})), new Promise(res => setTimeout(() => res({}), 12000))]));
 function intro() {
+  startUpdCheck();
   root.innerHTML = document.getElementById('intro').innerHTML;
   const fan = document.getElementById('fan').innerHTML;
   root.querySelectorAll('.fanslot').forEach(i => { i.innerHTML = fan; i.style.display = 'block'; i.querySelector('svg').style.cssText = 'width:100%;height:100%'; });
@@ -161,16 +165,14 @@ function intro() {
 async function afterIntro() {
   clearTimeout(introTimer); Sound.stopAll();
   if (S._afterIntro) return; S._afterIntro = true;
-  if (!S.st.introSeen) save({ introSeen: true });
-  // updates download in the background; the app opens at once
-  P.checkUpdate().catch(() => {});
+  await updateStep();
   if (!S.st.hw) scanScreen(); else appScreen();
   if (S.st.justUpdated) { const v = S.st.justUpdated; await save({ justUpdated: null }); setTimeout(() => toast(T('updDone')(v)), 900); }
 }
 async function updateStep() {
   root.innerHTML = `<div class="screen center" style="flex-direction:column;gap:26px"><div style="position:relative;width:90px;height:90px;margin:40px 0 50px"><div class="ring"></div><div class="ring" style="animation-delay:1.06s"></div><div class="led" style="position:absolute;top:50%;left:50%;width:6px;height:6px;margin:-3px;border-radius:3px;background:#fff"></div></div>
     <div class="fu updt" id="updtext">${T('updChecking')}</div><div class="track fu" style="width:320px;opacity:0;transition:opacity .5s" id="updtrack"><div id="updbar" style="width:0%;transition:width .4s"></div></div><div class="mono updsub" id="updsub"></div></div>`;
-  const r = await Promise.race([P.checkUpdate().catch(() => ({})), new Promise(res => setTimeout(() => res({}), 9000))]);
+  const r = await startUpdCheck();
   if (!r || !r.available) return;
   document.getElementById('updtext').textContent = T('updUpdating')(r.version);
   document.getElementById('updtrack').style.opacity = 1;
@@ -215,7 +217,7 @@ async function appScreen() {
       <div class="btabs"><div class="btablist"><button class="ctab on" data-act="ctab" data-v="edit">${T('editor')}</button><button class="ctab" data-act="ctab" data-v="out">${T('output')}</button><span class="mono small muted" id="cfile" style="margin-left:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></div><button class="ib sm" data-act="cclose" aria-label="close">${ico('x', 14)}</button></div>
       <div id="cedit" class="pbody"><div class="cbar"><button class="cb" data-act="csave">${T('saveFile')} · Ctrl+S</button><button class="cb pri" data-act="crun">${T('run')}</button><button class="cb" data-act="cext">${T('openWin')}</button><span id="cstate" class="mono small muted"></span></div><div id="cm" class="cmhost"></div></div>
       <div id="cout" class="pbody hidden"><div class="dhead"><span style="display:flex;align-items:center;gap:10px">${ico('play', 13)}<span class="mono small muted" id="dtitle"></span><span id="dcode" class="mono small"></span></span>
-        <span><button class="ib sm" data-act="drerun" title="${T('run')}">${ico('reload', 14)}</button></span></div><pre id="out"></pre><div class="runbar" id="runbar" style="display:none"><span class="mono small muted">›</span><input id="runin" placeholder="${T('runInputPh')}" autocomplete="off"><button class="ib sm" data-act="runSend" aria-label="send">${ico('fwd', 14)}</button></div></div>
+        <span><button class="cb" data-act="dkill" id="dkill" style="display:none">${T('stopRun')}</button><button class="cb" data-act="dclear">${T('clear')}</button><button class="ib sm" data-act="drerun" title="${T('run')}">${ico('reload', 14)}</button></span></div><pre id="out"></pre><div class="runbar" id="runbar" style="display:none"><span class="mono small muted">›</span><input id="runin" placeholder="${T('runInputPh')}" autocomplete="off"><button class="ib sm" data-act="runSend" aria-label="send">${ico('fwd', 14)}</button></div></div>
     </div></aside>
     <aside id="panel" class="panel"><div class="bshell">
       <div class="btabs"><div id="btabs" class="btablist"></div><button class="ib sm" data-act="pclose" aria-label="close">${ico('x', 14)}</button></div>
@@ -249,7 +251,7 @@ function renderMain() {
   m.style.padding = S.tab === 'chat' ? '48px 56px 28px' : '';
   if (S.tab === 'projects') { m.innerHTML = viewProjects(); loadProjects(); }
   else m.innerHTML = ({ chat: viewChat, models: viewModels, opt: viewOpt, agents: viewAgents, api: viewApi }[S.tab])();
-  if (S.tab === 'chat') { const box = $('#msgs'); box.scrollTop = box.scrollHeight; $('#input')?.focus(); }
+  if (S.tab === 'chat') { hookScroll(); const box = $('#msgs'); toBottom(box); $('#input')?.focus(); showBoost(); }
 }
 
 // ---------- models ----------
@@ -326,6 +328,7 @@ P.onProgress(({ id, got, total }) => {
   const bar = document.getElementById('pg-' + id), txt = document.getElementById('pt-' + id);
   if (bar) bar.style.width = (S.dl[id].total ? S.dl[id].got / S.dl[id].total * 100 : 0).toFixed(1) + '%';
   if (txt) txt.textContent = dlText(S.dl[id], findM(id));
+  if (id.startsWith('draft-')) showBoost();
 });
 // sees the model name and downloads the matching accelerator by itself; restarts the model with it when idle
 async function autoDraft(id, dr) {
@@ -340,9 +343,10 @@ async function startModel(id) {
   if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = engineText(); }
   const dd = draftOn(m), dr = dd && dd.id, canDraft = !!dr && p.draftRoom, useDraft = canDraft && S.local.has(dr);
   if (canDraft && !S.local.has(dr) && !S.dl[dr]) autoDraft(id, dr);
+  S.runPlan = p;
   const r = await P.start({ id, path: m.path, ngl: p.ngl, ctx: p.ctx, threads: p.threads, gpu: p.ngl > 0, layers: m.layers, slots: p.slots, cpuMoe: p.cpuMoe, draft: useDraft ? dr : null });
   if (!r.ok) { S.engine = { stage: 'error', error: r.error }; toast(T('eError') + ': ' + (r.error || '').slice(0, 300)); if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = engineText(); } return false; }
-  S.running = id; S.slots = r.slots || 1; S.engine = { stage: 'ready', kind: r.kind }; S.spec = !!r.spec; if (!S.sel || S.sel === 'local') S.sel = 'local';
+  S.running = id; S.slots = r.slots || 1; S.engine = { stage: 'ready', kind: r.kind }; S.spec = !!r.spec; showBoost(); if (!S.sel || S.sel === 'local') S.sel = 'local';
   renderNav(); if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = ''; const mp = $('#mpill'); if (mp) mp.textContent = m.name; } else renderMain();
   Sound.done();
   const sk = id + (r.spec ? '+spec' : '');
@@ -367,6 +371,22 @@ function speedText() {
   if (S.spec) return fast ? `${fast} ${T('tps')} · ${T('withBoost')}${base ? ` · ${T('noBoost')} ${base}` : ''}` : T('withBoost');
   return base ? `${base} ${T('tps')}` : '';
 }
+function boostState() {
+  if (!S.running) return null;
+  const m = findM(S.running), id = m && draftFor(m), d = id && DRAFTS.find(x => x.id === id);
+  if (S.spec) return { on: true, text: T('bOn'), tip: d ? d.name : '' };
+  if (!id) return { text: T('bNone'), tip: T('bNoneD') };
+  if (S.dl[id]) { const x = S.dl[id]; return { text: `${T('bLoading')} ${x.total ? Math.floor(x.got / x.total * 100) : 0}%`, tip: d.name }; }
+  if (!draftOn(m)) return { text: T('bOff'), tip: T('bOffD') };
+  if (S.runPlan && !S.runPlan.draftRoom) return { text: T('bNoRoom'), tip: T('bNoRoomD') };
+  return { text: T('bFail'), tip: T('bFailD') };
+}
+function showBoost() {
+  const el = $('#bpill'); if (!el) return; const b = boostState();
+  if (!b) { el.style.display = 'none'; return; }
+  el.style.display = ''; el.classList.toggle('on', !!b.on); el.title = b.tip || '';
+  el.innerHTML = `<span class="dot ${b.on ? 'led' : ''}"></span>${esc(b.text)}`;
+}
 function showSpeed() { const el = $('#spill'); if (el) { el.textContent = speedText(); el.style.display = el.textContent ? '' : 'none'; } }
 async function measureSpeed(id, spec) {
   try {
@@ -377,7 +397,7 @@ async function measureSpeed(id, spec) {
   } catch {}
 }
 P.onEngine(e => {
-  if (e.stage === 'stopped') { S.running = null; S.engine = null; renderNav(); }
+  if (e.stage === 'stopped') { S.running = null; S.engine = null; S.spec = false; renderNav(); showBoost(); }
   else if (e.stage !== 'ready') S.engine = e;
   if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = engineText(); }
 });
@@ -581,7 +601,7 @@ function viewChat() {
   const srcSel = src.length < 2 ? '' : `<select class="pick" data-act="sel">${src.map(s => `<option value="${s[0]}" ${S.sel === s[0] ? 'selected' : ''}>${esc(s[1])}</option>`).join('')}</select>`;
   const head = `<div class="row fu" style="margin-bottom:12px;gap:8px">
     <div class="chips"><button class="tgl ${auto ? 'on' : ''}" data-act="autoAgent" title="${T('autoAgentD')}"><span class="knob"></span>${T('autoModel')}</button>
-      ${auto ? `<span class="pill" id="apill">${esc(S.lastAgent || T('autoAgentPick'))}</span>` : `<select class="pick" data-act="agentSel">${opts}</select>`}${srcSel}<span class="pill mono" id="spill" style="${speedText() ? '' : 'display:none'}">${esc(speedText())}</span><span id="estatus">${S.engine && S.engine.stage !== 'ready' ? engineText() : ''}</span></div>
+      ${auto ? `<span class="pill" id="apill">${esc(S.lastAgent || T('autoAgentPick'))}</span>` : `<select class="pick" data-act="agentSel">${opts}</select>`}${srcSel}<span class="pill boost" id="bpill" style="display:none"></span><span class="pill mono" id="spill" style="${speedText() ? '' : 'display:none'}">${esc(speedText())}</span><span id="estatus">${S.engine && S.engine.stage !== 'ready' ? engineText() : ''}</span></div>
     <div class="chips">
       <button class="ibtn" data-act="wsOpen" title="${T('folder')}: ${esc(S.ws || '')}">${ico('folder')}</button>
       <button class="ibtn ${S.panel ? 'on' : ''}" data-act="panel" title="${T('browser')}">${ico('globe')}</button>
@@ -591,6 +611,7 @@ function viewChat() {
     <div class="fu" style="position:relative;width:120px;height:120px"><div class="ring"></div><div class="ring" style="animation-delay:1.06s"></div><div class="ring" style="animation-delay:2.13s"></div>
     <div class="led" style="position:absolute;top:50%;left:50%;width:6px;height:6px;margin:-3px;border-radius:3px;background:#fff"></div></div></div>`;
   return `<div class="chat">${head}<div class="msgs" id="msgs">${S.msgs.length ? S.msgs.map(msgHTML).join('') : empty}</div>
+    <button class="jump" id="jump" data-act="jump" aria-label="down"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></button>
     <div class="attachrow" id="attachrow"></div>
     <div class="composer fu" style="animation-delay:.15s"><button class="ib attachb" data-act="attach" title="${T('attachT')}" aria-label="attach"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5 12.5 20a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg></button><textarea id="input" rows="1" placeholder="${src.length ? T('placeholder') : T('chatNoModel')}"></textarea>
     <button class="send" data-act="${S.streaming ? 'stop' : 'send'}" aria-label="send">${sendIcon()}</button></div></div>`;
@@ -643,7 +664,19 @@ function addMsg(i) {
   const box = $('#msgs'); if (!box) return;
   $('#empty')?.remove();
   box.insertAdjacentHTML('beforeend', msgHTML(S.msgs[i], i));
-  box.scrollTop = box.scrollHeight;
+  if (S.msgs[i].role === 'user') S.follow = true;
+  if (S.follow !== false) toBottom(box); else showJump();
+}
+// the chat follows new text only while the user stays at the bottom; scrolling up stops it
+function toBottom(box) { const t = box.scrollHeight - box.clientHeight; if (Math.abs(box.scrollTop - t) > 1) { S._auto = true; box.scrollTop = t; } showJump(); }
+function showJump() { const j = $('#jump'); if (j) j.classList.toggle('on', S.follow === false); }
+function hookScroll() {
+  const box = $('#msgs'); if (!box || box._hooked) return; box._hooked = true; S.follow = true;
+  box.addEventListener('wheel', e => { if (e.deltaY < 0) { S.follow = false; showJump(); } }, { passive: true });
+  box.addEventListener('scroll', () => {
+    if (S._auto) { S._auto = false; return; }
+    S.follow = box.scrollHeight - box.scrollTop - box.clientHeight < 40; showJump();
+  }, { passive: true });
 }
 // repaint at most once per frame; only the parts that really changed are touched,
 // so step animations and shimmers do not restart on every token
@@ -653,9 +686,8 @@ function flushPaint(now) {
   paintRaf = 0; const box = $('#msgs'); if (!box) { paintQ.clear(); return; }
   if (now < paintNext) { paintRaf = requestAnimationFrame(flushPaint); return; }
   const t0 = performance.now();
-  const stick = box.scrollHeight - box.scrollTop - box.clientHeight < 220;
   for (const i of paintQ) paintNow(i); paintQ.clear();
-  if (stick) box.scrollTop = box.scrollHeight;
+  if (S.follow !== false) toBottom(box); else showJump();
   paintCost = paintCost * 0.7 + (performance.now() - t0) * 0.3;
   paintNext = now + Math.min(250, paintCost * 3);
 }
@@ -724,8 +756,12 @@ function stream(messages, signal, onDelta, extra, meta) {
 }
 const noThink = s => s.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim();
 const REFUSAL = /(не (имею|могу|умею)[^.\n]{0,80}(доступ|сохран|открыва|браузер|файл|компьютер|пк|интернет))|(у меня нет[^.\n]{0,40}(доступ|браузер))|(я (всего лишь|лишь|только)? ?текстов)|(I (can't|cannot|don't|do not)[^.\n]{0,80}(access|save|open|browse|file|computer|internet))|(text-based (AI|assistant))/i;
+// old action results and action blocks are dropped, so the model never redoes earlier requests
 function toApi(list) {
-  const out = [];
+  const out = []; let lastUser = -1;
+  list.forEach((m, k) => { if (m.role === 'user') lastUser = k; });
+  list = list.filter((m, k) => !(m.role === 'tool' && k < lastUser)).map((m, k) => m.role === 'assistant' && k < lastUser && m.content
+    ? { ...m, content: noThink(m.content).replace(/```(file|run|read|list|mkdir|move|open|search|click|type|scroll|back):[^\n`]*\n?[\s\S]*?```/g, '').trim() } : m);
   for (const m of list) {
     if (m.role === 'tool') out.push({ role: 'user', content: '[Action results]\n' + m.content });
     else if (m.stopped) continue;
@@ -772,6 +808,7 @@ async function execAction(a, repaint, auto) {
     let res;
     if (a.kind === 'file') {
       await P.ws.write(a.arg, a.body); res = `File saved: ${a.arg}`;
+      if (S.editFile === a.arg && ED) ED.set(a.body, a.arg);
       const lang = (a.arg.split('.').pop() || '').toLowerCase();
       if (/^(html?|py|js)$/.test(lang)) { const errs = await autoCheck({ lang: lang.startsWith('htm') ? 'html' : lang, code: a.body }, lang.startsWith('htm')); if (errs.length) { a.warn = errs.length; res += `\nPULSAR checked it and found problems — fix them and save the file again:\n- ${errs.join('\n- ')}`; } }
     }
@@ -819,9 +856,10 @@ function openIntent(t) {
   if (!/(открой|открыть|откройте|открывай|зайди|перейди|запусти|включи|покажи сайт|\bopen\b|go to)/.test(s)) return null;
   const u = s.match(/https?:\/\/\S+/); if (u) return u[0];
   const d = s.match(/\b([a-z0-9-]+\.)+(ru|com|org|net|io|dev|рф|su|me|app|info|xyz|tv)(\/\S*)?/); if (d) return 'https://' + d[0];
-  for (const [re, url] of SITES) if (re.test(s)) return url;
+  const after = (s.match(/(?:открой|открыть|откройте|открывай|зайди|перейди|запусти|включи|покажи сайт|\bopen\b|go to)\s+(?:на\s+|в\s+|мне\s+|сайт\s+)*((?:\S+\s*){1,3})/) || [])[1] || '';
+  if (s.split(/\s+/).length <= 8 || after) for (const [re, url] of SITES) if (re.test(after || s)) return url;
   // "открой его / ты открой / открой первую" -> the site from the last answer
-  if (S.lastLinks && S.lastLinks.length && /(открой|открыть|open)\s*(его|её|ее|это|эту|этот|первую|первый|ссылку|сайт|it|that|the first)?\s*[.!?]*$/.test(s.replace(/(^|\s)(ты|ну|давай|а|мне|пожалуйста|плиз)(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim())) return S.lastLinks[0];
+  if (S.lastLinks && S.lastLinks.length && s.split(/\s+/).length <= 5 && !BUILD_RE.test(s) && /(открой|открыть|open)\s*(его|её|ее|это|эту|этот|первую|первый|ссылку|сайт|it|that|the first)?\s*[.!?]*$/.test(s.replace(/(^|\s)(ты|ну|давай|а|мне|пожалуйста|плиз)(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim())) return S.lastLinks[0];
   return null;
 }
 const SAVE_RE = /(сохрани|сохранить|сохраняй|на пк|на компьютер|на комп|в файл|создай файл|запиши|\bsave\b|to (a )?file)/i;
@@ -974,7 +1012,7 @@ async function browse(url, show) {
 const SNAP_JS = `(()=>{document.querySelectorAll('[data-pid]').forEach(e=>e.removeAttribute('data-pid'));let n=0;const out=[];
  const els=[...document.querySelectorAll('a[href],button,input,textarea,select,[role=button],[role=link],[onclick],summary')].filter(e=>{const r=e.getBoundingClientRect();const st=getComputedStyle(e);return r.width>2&&r.height>2&&st.visibility!=='hidden'&&st.display!=='none'&&!e.disabled});
  for(const e of els.slice(0,80)){n++;e.setAttribute('data-pid',n);const t=(e.innerText||e.value||e.placeholder||e.getAttribute('aria-label')||e.title||e.name||'').trim().replace(/\\s+/g,' ').slice(0,60);out.push('['+n+'] '+e.tagName.toLowerCase()+(e.type&&e.tagName!=='BUTTON'?'('+e.type+')':'')+' '+JSON.stringify(t));}
- return JSON.stringify({url:location.href,title:document.title,elements:out,text:(document.body?document.body.innerText:'').replace(/\\n{3,}/g,'\\n\\n').slice(0,5000)});})()`;
+ return JSON.stringify({url:location.href,title:document.title,elements:out,text:(()=>{const m=document.querySelector('main,article,[role=main],#content,.content');const t=m&&m.innerText.length>400?m.innerText:(document.body?document.body.innerText:'');return t.replace(/\\n{3,}/g,'\\n\\n').slice(0,6000)})()});})()`;
 async function snapshot(t) {
   if (t.failed) return `(the page could not be opened: ${t.failed})`;
   for (let i = 0; i < 6; i++) { let n = 0; try { n = await t.wv.executeJavaScript('(document.body&&document.body.innerText||"").length'); } catch (e) {} if (n > 200) break; await new Promise(r => setTimeout(r, 500)); }
@@ -984,16 +1022,21 @@ async function snapshot(t) {
 function waitLoad(t, ms) {
   return new Promise(res => { let done = false; const fin = () => { if (done) return; done = true; t.wv.removeEventListener('did-stop-loading', fin); setTimeout(res, 500); }; t.wv.addEventListener('did-stop-loading', fin); setTimeout(fin, ms || 2500); });
 }
+// element by its number from the list, or by its visible text / placeholder
+const FIND_EL = q => /^\s*\d+\s*$/.test(q) ? `document.querySelector('[data-pid="${parseInt(q)}"]')`
+  : `(()=>{const q=${JSON.stringify(String(q).trim().toLowerCase())};const all=[...document.querySelectorAll('a[href],button,input,textarea,select,[role=button],[role=link],[onclick],summary,label')].filter(e=>e.getBoundingClientRect().width>2);
+    const txt=e=>(e.innerText||e.value||e.placeholder||e.getAttribute('aria-label')||e.title||e.name||'').trim().toLowerCase();
+    return all.find(e=>txt(e)===q)||all.find(e=>txt(e).includes(q))||null})()`;
 async function browserAct(a, repaint) {
   const t = curTab(); if (!t || t.url === START) throw new Error('no page is open — use open: first');
   const before = t.url;
   if (a.kind === 'click') {
-    const r = await t.wv.executeJavaScript(`(()=>{const e=document.querySelector('[data-pid="${parseInt(a.arg)}"]');if(!e)return 'missing';e.scrollIntoView({block:'center'});e.click();return 'ok'})()`);
+    const r = await t.wv.executeJavaScript(`(()=>{const e=${FIND_EL(a.arg)};if(!e)return 'missing';e.scrollIntoView({block:'center'});e.click();return 'ok'})()`);
     if (r !== 'ok') throw new Error('element ' + a.arg + ' not found — take a fresh look at the page');
     await waitLoad(t, 2500);
   } else if (a.kind === 'type') {
     const [n, ...rest] = a.arg.split('|'); let text = rest.join('|'); const submit = /(\\n|⏎|\{enter\})$/i.test(text) || /\n$/.test(a.body || ''); text = text.replace(/(\\n|⏎|\{enter\})$/i, '');
-    const r = await t.wv.executeJavaScript(`(()=>{const e=document.querySelector('[data-pid="${parseInt(n)}"]');if(!e)return 'missing';e.focus();const p=Object.getPrototypeOf(e);const d=Object.getOwnPropertyDescriptor(p,'value');d&&d.set?d.set.call(e,${JSON.stringify(text)}):(e.value=${JSON.stringify(text)});e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));
+    const r = await t.wv.executeJavaScript(`(()=>{const e=${FIND_EL(n)};if(!e)return 'missing';e.focus();const p=Object.getPrototypeOf(e);const d=Object.getOwnPropertyDescriptor(p,'value');d&&d.set?d.set.call(e,${JSON.stringify(text)}):(e.value=${JSON.stringify(text)});e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));
       if(${submit}){e.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,bubbles:true}));if(e.form){e.form.requestSubmit?e.form.requestSubmit():e.form.submit()}}return 'ok'})()`);
     if (r !== 'ok') throw new Error('field ' + n + ' not found');
     await waitLoad(t, submit ? 3000 : 400);
@@ -1027,7 +1070,7 @@ async function runFile(rel, title) {
   if (r.error || !r.ok) { out.textContent = r.noPython ? T('noPython') : (r.error || 'error'); dc.textContent = '● -1'; dc.className = 'mono small err'; setRunInput(false); S.runId = null; }
   else setTimeout(() => document.getElementById('runin')?.focus(), 100);
 }
-function setRunInput(on) { const w = document.getElementById('runbar'); if (w) w.style.display = on ? 'flex' : 'none'; }
+function setRunInput(on) { const w = document.getElementById('runbar'); if (w) w.style.display = on ? 'flex' : 'none'; const k = document.getElementById('dkill'); if (k) k.style.display = on ? '' : 'none'; }
 P.onRunOut(({ id, data }) => { if (id !== S.runId) return; const o = document.getElementById('out'); o.textContent += data; o.scrollTop = o.scrollHeight; });
 P.onRunExit(({ id, code, missing }) => {
   if (id !== S.runId) return; S.runId = null; setRunInput(false);
@@ -1050,7 +1093,8 @@ const FEWSHOT = {
 };
 const memText = () => (S.st.memory || []).length ? `\nWhat you know about the user from earlier chats (use it naturally, do not list it):\n${S.st.memory.map(x => '- ' + x).join('\n')}` : '';
 const MEM_RULE = '\nIf the user tells you something lasting about themselves (name, city, work, projects, what they like or want from you), put at the very end of your reply one line per fact: [[remember: short fact]]. If they ask to forget something: [[forget: the fact]]. Never mention these lines.';
-const sysMsg = (prompt, tools, mem) => ({ role: 'system', content: prompt + (tools ? '\n' + TOOLS_PROMPT : '') + (mem ? MEM_RULE : '') + memText() + `\nWorkspace folder: ${S.ws || ''}` });
+const ONLY_LAST = '\nDo ONLY what the LAST user message asks. Earlier messages are just context: never repeat earlier searches, sites or tasks unless the last message asks for it again. When the task is done, give the answer and stop.';
+const sysMsg = (prompt, tools, mem) => ({ role: 'system', content: prompt + ONLY_LAST + (tools ? '\n' + TOOLS_PROMPT : '') + (mem ? MEM_RULE : '') + memText() + `\nWorkspace folder: ${S.ws || ''}` });
 const MEM_RE = /\[\[\s*(remember|forget|запомни|забудь)\s*:\s*([^\]]+?)\s*\]\]/gi;
 const stripMem = s => (s || '').replace(MEM_RE, '').replace(/\[\[[^\]]*\]?$/, '').trimEnd();
 const NAME_RE = /(?:меня зовут|моё имя|мое имя|зови меня|my name is|call me)\s+([A-Za-zА-Яа-яЁё-]{2,20})|меня\s+([A-Za-zА-Яа-яЁё-]{2,20})\s+зовут/i;
@@ -1069,8 +1113,12 @@ async function applyMemory(msg) {
   msg.memNote = add.length ? T('memSaved') + ' ' + add.join(' · ') : T('memForgot');
 }
 const fewshot = () => FEWSHOT[L()].map(([role, content]) => ({ role, content }));
+const PAGE_ACT_RE = /(нажми|кликни|клик|тыкни|введи|впиши|заполни|прокрути|пролистай|листай|вернись назад|назад на|на (этой |открытой )?странице|на (этом )?сайте|залогин|войди в|авторизу|выбери в|click|press|type in|fill|scroll|go back|on (this|the) page)/i;
+const FOLLOW_RE = /^(а теперь |теперь )?(добавь|исправь|переделай|измени|поменяй|убери|улучши|доработай|почини|допиши|add |fix |change |remove |improve )/i;
 function pickAgent(t) {
   const def = id => { const a = ourAgents().find(x => x[0] === id); return { id: a[0], name: a[1], prompt: a[3], tools: a[4] }; };
+  if (PAGE_ACT_RE.test(t) && B.tabs.some(x => x.url !== START)) return def('browser');
+  if (FOLLOW_RE.test(t.trim()) && S.lastAgentId === 'coder' && t.length < 160) return def('coder');
   const build = BUILD_RE.test(t) || /(код|программ|скрипт|сайт|html|python|питон|ошибк|баг|code|bug)/i.test(t);
   if (!build && (openIntent(t) || /(найди|поищи|загугли|новост|курс (доллар|евро|валют|рубл|биткоин)|погод|в интернете|в сети|актуальн|сегодня|узнай|цен[аы] на|search|find|look up|news|weather|price of)/i.test(t))) return def('browser');
   if (!build && /(файл|папк|переимен|перемест|разлож|отсортир|сортир|документ|дубликат|рабоч\w* папк|folder|file|rename|move|organi[sz]e|sort)/i.test(t)) return def('files');
@@ -1100,7 +1148,8 @@ function cool(signal) {
 }
 async function runAgent(ag, userText, signal) {
   S.curAgentName = ag.name;
-  for (let round = 0; round < 6; round++) {
+  const doneActs = new Set();
+  for (let round = 0; round < (ag.id === 'browser' ? 10 : 6); round++) {
     if (S.temps?.hot) { const w = { role: 'assistant', content: '', live: true, status: T('cooling') }; S.msgs.push(w); const wi = S.msgs.length - 1; addMsg(wi); await cool(signal); S.msgs.splice(wi, 1); root.querySelector(`.msg[data-i="${wi}"]`)?.remove(); }
     if (round === 0 && ag.id === 'files') { let l = []; try { l = await P.ws.list('.'); } catch (e) {} S.msgs.push({ role: 'tool', content: `Workspace files (${l.length}):\n${l.join('\n') || '(empty)'}` }); addMsg(S.msgs.length - 1); }
     const history = toApi(S.msgs.slice(-24));
@@ -1124,7 +1173,9 @@ async function runAgent(ag, userText, signal) {
     for (const a of acts) {
       if (signal.aborted) return;
       if (/^(file|mkdir|move)$/.test(a.kind) && !allowed) { a.state = 'denied'; paint(idx); results.push(`${a.arg}: the user did not allow saving.`); continue; }
-      results.push(await execAction(a, () => paint(idx)));
+      const key = a.kind + ':' + a.arg;
+      if (/^(open|search|read|list)$/.test(a.kind) && doneActs.has(key)) { a.state = 'done'; paint(idx); results.push(`${key} — already done above, use that result.`); continue; }
+      const r = await execAction(a, () => paint(idx)); if (a.state === 'done') doneActs.add(key); results.push(r);
     }
     S.msgs.push({ role: 'tool', content: results.join('\n\n') }); addMsg(S.msgs.length - 1);
   }
@@ -1417,7 +1468,18 @@ async function sendMsg() {
     S.msgs.push({ role: 'assistant', content: T('alreadySaved')(S.ws + '\\' + p.dir.replace(/\//g, '\\')), extra: p.files.map(f => ({ id: 'a' + (++actSeq), kind: 'file', arg: f, state: 'done' })) }); addMsg(S.msgs.length - 1);
     P.ws.openFile(p.dir); S.streaming = null; setSendBtn(); lockComposer(false); Sound.done(); saveChat().catch(() => {}); return;
   }
-  const pill = $('#apill'); if (pill && auto) pill.textContent = chain ? (plan.urls.length || plan.research ? 'PULSAR IN BROWSER → PULSAR CODE' : 'PULSAR CODE ×2') : ag.name;
+  S.lastAgent = chain ? (plan.urls.length || plan.research ? 'PULSAR IN BROWSER → PULSAR CODE' : 'PULSAR CODE ×2') : ag.name; S.lastAgentId = chain ? 'coder' : ag.id;
+  const pill = $('#apill'); if (pill && auto) { pill.textContent = S.lastAgent; pill.classList.remove('flash'); void pill.offsetWidth; pill.classList.add('flash'); }
+  // auto also picks the downloaded model that fits this request best
+  if (auto && S.running && !url) {
+    const kind = chain || ag.id === 'coder' ? 'code' : ag.id === 'chat' ? taskKind(text) : 'general';
+    const cur = findM(S.running), best = pickModel(kind);
+    if (best && cur && best.id !== S.running && !cur.tags.includes(kind) && best.tags.includes(kind)) {
+      const prev = S.running; toast(T('switching') + ' ' + best.name);
+      if (!(await startModel(best.id))) await startModel(prev);
+      const mp = $('#mpill'); if (mp && S.running) mp.textContent = findM(S.running).name;
+    }
+  }
   try {
     if (chain && S.running) await runChain(text, ctl.signal, plan);
     else if (url) {
@@ -1427,7 +1489,10 @@ async function sendMsg() {
       const rest = text.replace(/(открой|открыть|зайди|перейди|open|go to)[^,.;]*/i, '').trim();
       if (S.running && rest.split(/\s+/).length >= 3) { S.msgs.push({ role: 'tool', content: res }); addMsg(S.msgs.length - 1); await runAgent(ag, text, ctl.signal); }
     } else {
-      if (ag.id === 'browser' && !SAVE_RE.test(text)) {
+      const pageTab = B.tabs.find(x => x.id === B.active && x.url !== START);
+      if (ag.id === 'browser' && pageTab && PAGE_ACT_RE.test(text) && !SEARCH_RE.test(text)) {
+        S.msgs.push({ role: 'tool', content: `The page open in the built-in browser now:\n${await snapshot(pageTab)}\nDo what the user asks on THIS page with click:/type:/scroll:/back: blocks, one or two at a time, then check the result.` }); addMsg(S.msgs.length - 1);
+      } else if (ag.id === 'browser' && !SAVE_RE.test(text)) {
         const m = { role: 'assistant', content: '', extra: [{ id: 'a' + (++actSeq), kind: 'search', arg: text.slice(0, 120), state: 'wait' }] };
         S.msgs.push(m); const i = S.msgs.length - 1; addMsg(i);
         const res = await execAction(m.extra[0], () => paint(i), false);
@@ -1495,6 +1560,7 @@ root.addEventListener('click', async e => {
       await P.stop(); S.running = null; S.engine = null; S.msgs = []; S.chatId = null; S.lastProject = null; S._lastTab = null;
       renderNav(); renderMain(); toast(T('ended')); break;
     case 'send': sendMsg(); break;
+    case 'jump': { S.follow = true; const box = $('#msgs'); if (box) { box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' }); S._auto = true; } showJump(); break; }
     case 'stop': S.streaming?.abort(); Object.values(S.pending).forEach(r => r(false)); S.pending = {}; break;
     case 'allow': case 'deny': { const r = S.pending[v]; delete S.pending[v]; r && r(b.dataset.act === 'allow'); break; }
     case 'autoAgent': await save({ autoAgent: S.st.autoAgent === false }); Sound.tick(1500); S._lastTab = 'chat'; renderMain(); break;
@@ -1536,6 +1602,8 @@ root.addEventListener('click', async e => {
     case 'projFolder': P.ws.openFile(v); break;
     case 'projGo': { const pr = (S.projects || []).find(p => p.dir === v); if (pr) { S.msgs = []; S.chatId = null; S.lastProject = { dir: pr.dir, site: true, files: pr.files }; S.tab = 'chat'; S._lastTab = null; renderNav(); renderMain(); toast(T('projCont')(pr.dir)); } break; }
     case 'runSend': sendRunInput(); break;
+    case 'dkill': if (S.runId) { P.runKill(S.runId); } break;
+    case 'dclear': { const o = document.getElementById('out'); if (o) o.textContent = ''; break; }
     case 'drerun': if (S.lastRun) runFile(S.lastRun); break;
     case 'copy': navigator.clipboard.writeText(CODES[v].code); toast(T('copied')); break;
     case 'saveAs': { const c = CODES[v]; const ext = EXT[c.lang.toLowerCase()] || 'txt'; await P.ws.saveAs('file.' + ext, c.code); break; }
@@ -1548,6 +1616,7 @@ root.addEventListener('click', async e => {
   }
 });
 document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'Enter' && S.code === 'edit' && S.editFile && e.target.closest && e.target.closest('#cm')) { e.preventDefault(); saveEditor().then(() => runFile(S.editFile)); return; }
   if (e.target.id === 'runin' && e.key === 'Enter') { e.preventDefault(); sendRunInput(); return; }
   if (e.target.id === 'addr' && e.key === 'Enter') {
     let u = e.target.value.trim(); if (!u) return;
@@ -1578,7 +1647,12 @@ P.onTemps(t => {
   if (t.max >= (t.limit || 80) + 10 && S.streaming) { S.streaming.abort(); toast(T('tooHot')(Math.round(t.max))); }
 });
 P.onUpdate(u => { S.update = { ...(S.update || {}), ...u }; const ub = document.getElementById('updbar'); if (ub && u.percent != null) ub.style.width = u.percent + '%';
-  const us = document.getElementById('updsub'); if (us && u.total) { const mb = x => (x / 1048576).toFixed(0); us.textContent = `${u.percent}% · ${mb(u.got)} / ${mb(u.total)} ${T('mb')} · ${(u.speed / 1048576).toFixed(1)} ${T('mb')}/s`; } if ($('#nav')) renderNav(); if (u.state === 'ready') toast(T('updReady')(u.version)); });
+  const us = document.getElementById('updsub'); if (us && u.total) { const mb = x => (x / 1048576).toFixed(0); us.textContent = `${u.percent}% · ${mb(u.got)} / ${mb(u.total)} ${T('mb')} · ${(u.speed / 1048576).toFixed(1)} ${T('mb')}/s`; } if ($('#nav')) renderNav(); if (u.state === 'ready') autoInstall(u.version); });
+async function autoInstall(v) {
+  toast(T('updReady')(v));
+  while (S.streaming || Object.keys(S.dl).length) await new Promise(r => setTimeout(r, 3000));
+  await save({ justUpdated: v }); setTimeout(() => P.installUpdate(), 1500);
+}
 P.onLoad(l => {
   const was = S.busy; S.busy = l.busy ? l.name : null;
   if (S.busy && S.busy !== was && S.running) toast(T('busy')(S.busy));
@@ -1593,5 +1667,5 @@ function applyTheme() { document.documentElement.classList.toggle('light', S.st.
   if (S.st.apis) await save({ apis: [] });
   if (S.st.agent === 'team' || !['chat', 'coder', 'files', 'browser'].includes(S.st.agent || 'coder')) await save({ agent: 'chat' });
   if (S.st.lang) document.documentElement.lang = S.st.lang;
-  if (!S.st.lang) langScreen(); else if (!S.st.introSeen) intro(); else afterIntro();
+  if (!S.st.lang) langScreen(); else intro();
 })();
