@@ -93,8 +93,8 @@ AGENTS.en = [
   ['browser', 'PULSAR IN BROWSER', 'Searches the web, opens sites in the built-in browser, summarizes.', 'You are PULSAR IN BROWSER, a web agent. Search for information, open sites in the built-in browser, read them, separate facts from guesses, give a short conclusion with links.', true]
 ];
 
-Object.assign(I18N.ru, { autoAgentD: 'PULSAR сам выбирает агента под каждый запрос: код и сайты — PULSAR CODE, файлы и папки — FILE SUP, поиск и сайты в интернете — PULSAR IN BROWSER.', autoAgentPick: 'агент выберется сам' });
-Object.assign(I18N.en, { autoAgentD: 'PULSAR picks the agent for every request: code and sites — PULSAR CODE, files and folders — FILE SUP, web search and sites — PULSAR IN BROWSER.', autoAgentPick: 'agent is picked automatically' });
+Object.assign(I18N.ru, { autoAgentD: 'PULSAR сам выбирает агента под каждый запрос: разговор — HELLO PULSAR, код и сайты — PULSAR CODE, файлы и папки — FILE SUP, поиск и сайты в интернете — PULSAR IN BROWSER.', autoAgentPick: 'агент выберется сам' });
+Object.assign(I18N.en, { autoAgentD: 'PULSAR picks the agent for every request: talk — HELLO PULSAR, code and sites — PULSAR CODE, files and folders — FILE SUP, web search and sites — PULSAR IN BROWSER.', autoAgentPick: 'agent is picked automatically' });
 
 Object.assign(I18N.ru, { catAll: 'Все', catFast: 'Быстрые', catCode: 'Код', catLogic: 'Задачи и логика', catPower: 'Мощные',
   catFastD: 'мгновенные ответы на повседневные вопросы', catCodeD: 'сайты, программы, агенты', catLogicD: 'думают по шагам: математика, задачи', catPowerD: 'умнее, но медленнее и тяжелее',
@@ -169,3 +169,10 @@ TOOLS_PROMPT = TOOLS_PROMPT.replace('After your blocks, stop.', `Browser control
 \`\`\`
 click: clicks element N. type: types into field N ({enter} at the end submits). scroll: down or up. back: previous page. The user is asked before every new website.
 After your blocks, stop.`);
+
+AGENTS.ru.unshift(['chat', 'HELLO PULSAR', 'Просто поговорить: вопросы, советы, идеи, объяснения простыми словами.', 'Ты HELLO PULSAR — дружелюбный и умный собеседник. Отвечай по-человечески, тепло, коротко и по делу, на языке пользователя. Объясняй сложное простыми словами и с примерами. Если человек просит сделать сайт или программу — скажи, что это сделает PULSAR CODE, а если найти что-то в интернете — PULSAR IN BROWSER, и предложи включить «Авто».', false]);
+AGENTS.en.unshift(['chat', 'HELLO PULSAR', 'Just talk: questions, advice, ideas, simple explanations.', 'You are HELLO PULSAR, a friendly and smart companion. Answer like a person: warm, short and to the point, in the user\'s language. Explain complex things simply, with examples. If asked to build a site or program, say PULSAR CODE will do it; for web search, PULSAR IN BROWSER — and suggest turning on Auto.', false]);
+Object.assign(I18N.ru, { permSiteT: 'Открыть сайт', permSiteD: 'Агент откроет страницу во встроенном браузере и прочитает её.', permSaveT: n => n === 1 ? 'Сохранить файл на компьютер' : `Сохранить файлы на компьютер (${n})`, permSaveD: 'Файлы появятся в папке «Документы\\PULSAR».',
+  alwaysFor: h => `Всегда для ${h.replace(/^www\./, '')}`, oTrusted: 'Доверенные сайты', oTrustedD: 'Сайты, которые агенты открывают без вопроса', clear: 'очистить' });
+Object.assign(I18N.en, { permSiteT: 'Open website', permSiteD: 'The agent will open the page in the built-in browser and read it.', permSaveT: n => n === 1 ? 'Save the file to your computer' : `Save ${n} files to your computer`, permSaveD: 'Files will appear in Documents\\PULSAR.',
+  alwaysFor: h => `Always for ${h.replace(/^www\./, '')}`, oTrusted: 'Trusted sites', oTrustedD: 'Sites the agents open without asking', clear: 'clear' });

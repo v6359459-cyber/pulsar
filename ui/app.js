@@ -37,7 +37,7 @@ const T = k => (I18N[S.st.lang || 'ru'] || I18N.ru)[k] ?? k;
 const L = () => S.st.lang || 'ru';
 const save = patch => { Object.assign(S.st, patch); return P.setSettings(patch); };
 let toastTimer;
-function toast(msg) { document.querySelector('.toast')?.remove(); const d = document.createElement('div'); d.className = 'toast'; d.textContent = msg; document.body.appendChild(d); clearTimeout(toastTimer); toastTimer = setTimeout(() => d.remove(), 3500); }
+function toast(msg) { document.querySelector('.toast')?.remove(); const d = document.createElement('div'); d.className = 'toast'; d.textContent = msg; document.body.appendChild(d); clearTimeout(toastTimer); toastTimer = setTimeout(() => { d.classList.add('out'); setTimeout(() => d.remove(), 350); }, 3500); }
 
 // ---------- optimization ----------
 function plan(m) {
@@ -193,6 +193,7 @@ function renderMain() {
   const m = $('#main'); if (!m) return;
   const same = S._lastTab === S.tab; S._lastTab = S.tab;
   m.classList.toggle('still', same);
+  if (!same) { m.classList.remove('swap'); void m.offsetWidth; m.classList.add('swap'); }
   m.style.padding = S.tab === 'chat' ? '48px 56px 28px' : '';
   if (S.tab === 'projects') { m.innerHTML = viewProjects(); loadProjects(); }
   else m.innerHTML = ({ chat: viewChat, models: viewModels, opt: viewOpt, agents: viewAgents, api: viewApi }[S.tab])();
@@ -333,6 +334,7 @@ function viewOpt() {
     ['sound', T('oSound'), T('oSoundD'), S.st.sound !== false ? T('on') : T('off')],
     ['theme', T('oTheme'), T('oThemeD'), S.st.theme === 'light' ? T('light') : T('dark')],
     ['tray', T('oTray'), T('oTrayD'), S.st.tray !== false ? T('on') : T('off')],
+    ['trusted', T('oTrusted'), T('oTrustedD'), (S.st.trustedHosts || []).length ? `${(S.st.trustedHosts || []).length} · ${T('clear')}` : '—'],
     ['lang', T('oLang'), '', L() === 'ru' ? 'Русский' : 'English']
   ];
   return `<h2 class="fu">${T('tOpt')}</h2><p class="sub fu" style="animation-delay:.08s">${T('optSub')}</p>
@@ -353,6 +355,7 @@ async function toggleOpt(k) {
   if (k === 'sound') await save({ sound: S.st.sound === false });
   if (k === 'theme') { await save({ theme: S.st.theme === 'light' ? 'dark' : 'light' }); applyTheme(); }
   if (k === 'tray') await save({ tray: S.st.tray === false });
+  if (k === 'trusted') await save({ trustedHosts: [] });
   if (k === 'heat') { const seq = [[true, 80], [true, 75], [true, 85], [false, 80]]; const i = seq.findIndex(x => x[0] === (S.st.heat !== false) && x[1] === (S.st.heatLimit || 80)); const n = seq[(i + 1) % seq.length]; await save({ heat: n[0], heatLimit: n[1] }); }
   if (k === 'lang') { await save({ lang: L() === 'ru' ? 'en' : 'ru' }); renderNav(); }
   await save({ opt: o }); Sound.tick(1500); renderMain();
@@ -435,12 +438,28 @@ const ico = (n, s) => `<svg width="${s || 16}" height="${s || 16}" viewBox="0 0 
 let codeSeq = 0;
 const CODES = {};
 const RUNNABLE = { python: 'py', py: 'py', javascript: 'js', js: 'js', node: 'js', html: 'html' };
+function permCard(p) {
+  const site = p.type === 'site';
+  const host = site ? p.host : '';
+  const icon = site ? ico('globe', 18) : ico('folder', 18);
+  const who = p.agent ? `<span class="perm-who">${esc(p.agent)}</span>` : '';
+  const title = site ? (p.label || T('permSiteT')) : T('permSaveT')(p.files.length);
+  const body = site
+    ? `<div class="perm-host"><span class="perm-av">${esc((host.replace(/^www\./, '')[0] || '?').toUpperCase())}</span><span class="mono">${esc(host)}</span></div><div class="perm-d">${T('permSiteD')}</div>`
+    : `<div class="perm-files">${p.files.map(f => `<div class="perm-file">${ico('folder', 13)}<span class="mono">${esc(f)}</span></div>`).join('')}</div><div class="perm-d">${T('permSaveD')}</div>`;
+  const btns = site
+    ? `<button class="pbtn pri" data-act="allow" data-v="${p.id}">${T('allow')}</button><button class="pbtn" data-act="allowSite" data-v="${p.id}" data-h="${esc(host)}">${T('alwaysFor')(host)}</button><button class="pbtn ghost" data-act="deny" data-v="${p.id}">${T('deny')}</button>`
+    : `<button class="pbtn pri" data-act="allow" data-v="${p.id}">${T('saveFile')}</button><button class="pbtn ghost" data-act="deny" data-v="${p.id}">${T('deny')}</button>`;
+  return `<div class="perm"><div class="perm-ic">${icon}</div><div class="perm-main">${who}<div class="perm-t">${esc(title)}</div>${body}
+    <div class="perm-btns">${btns}</div>${site ? `<button class="perm-link" data-act="allowAll" data-v="${p.id}">${T('allowAllReq')}</button>` : ''}</div></div>`;
+}
 function actLine(kind, arg, a) {
   const label = { file: T('aFile'), run: T('aRun'), read: T('aRead'), list: T('aList'), open: T('aOpen'), search: T('aSearch'), click: T('aClick'), type: T('aType'), scroll: T('aScroll'), back: T('aBack') }[kind];
   let right = '';
   if (a) {
     const sm = { wait: T('sWait'), ask: T('sAsk'), work: T('sWork'), done: T('sDone'), denied: T('sDenied'), error: T('sError') };
-    if (a.state === 'ask') right = `<span>${a.site ? `<span class="small muted" style="margin-right:8px">${T('askSite')} ${esc(a.site)}?</span>` : ''}<button class="cb pri" data-act="allow" data-v="${a.id}">${T('allow')}</button><button class="cb" data-act="deny" data-v="${a.id}">${T('deny')}</button>${a.site ? `<button class="cb" data-act="allowAll" data-v="${a.id}">${T('allowAllReq')}</button>` : ''}</span>`;
+    if (a.state === 'ask' && a.site) return permCard({ type: 'site', id: a.id, host: a.site, label: kind === 'search' ? T('askSearch') : T('permSiteT'), agent: S.curAgentName });
+    if (a.state === 'ask') right = `<span><button class="cb pri" data-act="allow" data-v="${a.id}">${T('allow')}</button><button class="cb" data-act="deny" data-v="${a.id}">${T('deny')}</button></span>`;
     else if (a.state === 'done' && kind === 'file') right = `<span><button class="cb" data-act="fopen" data-v="${esc(arg)}">${T('open')}</button>${/\.(py|js|html?)$/i.test(arg) ? `<button class="cb pri" data-act="frun" data-v="${esc(arg)}">${T('run')}</button>` : ''}</span>`;
     else right = `<span class="st ${a.state === 'done' ? 'ok' : a.state === 'error' ? 'err' : ''}">${a.state === 'work' ? '<span class="shimmer">' + sm.work + '</span>' : sm[a.state] + (a.err ? ': ' + esc(a.err).slice(0, 80) : '')}</span>`;
   }
@@ -622,7 +641,7 @@ async function doSearch(q) {
   return res.length ? res.map((x, i) => `[${i + 1}] ${x.title} — ${x.url}\n${x.text}`).join('\n\n') : '(no results)';
 }
 const hostOf = u => { try { return new URL(u).host; } catch { return u; } };
-function siteAllowed(u) { return S.allowAll || (S.allowedHosts && S.allowedHosts.has(hostOf(u))); }
+function siteAllowed(u) { const h = hostOf(u); return S.allowAll || (S.allowedHosts && S.allowedHosts.has(h)) || (S.st.trustedHosts || []).includes(h); }
 async function askSiteAction(a, url, repaint) {
   if (siteAllowed(url)) return true;
   a.state = 'ask'; a.site = hostOf(url); repaint(); Sound.soft();
@@ -745,11 +764,13 @@ function initBrowser() {
 }
 function newTab(url) {
   const id = ++B.seq; const wv = document.createElement('webview');
-  wv.setAttribute('src', url || START); wv.setAttribute('partition', 'persist:pulsar'); wv.setAttribute('webpreferences', 'backgroundThrottling=yes, spellcheck=no'); wv.dataset.tab = id;
+  wv.setAttribute('src', url || START); wv.setAttribute('partition', 'persist:pulsar');
+  wv.setAttribute('useragent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'); wv.setAttribute('webpreferences', 'backgroundThrottling=yes, spellcheck=no'); wv.dataset.tab = id;
   if (B.tabs.length >= 8) { const old = B.tabs.find(x => x.id !== B.active) || B.tabs[0]; old.wv.remove(); B.tabs.splice(B.tabs.indexOf(old), 1); }
   const t = { id, wv, title: '…', url: url || START, loading: true, ready: new Promise(r => wv.addEventListener('dom-ready', r, { once: true })) };
   wv.addEventListener('page-title-updated', e => { t.title = e.title; drawTabs(); });
-  wv.addEventListener('did-start-loading', () => { t.loading = true; drawBar(); drawTabs(); });
+  wv.addEventListener('did-start-loading', () => { t.loading = true; t.failed = null; drawBar(); drawTabs(); });
+  wv.addEventListener('did-fail-load', e => { if (e.isMainFrame && e.errorCode !== -3) { t.failed = `${e.errorDescription || 'error'} (${e.errorCode})`; t.loading = false; drawBar(); drawTabs(); } });
   wv.addEventListener('did-stop-loading', () => { t.loading = false; drawBar(); drawTabs(); });
   const nav = e => { t.url = e.url; if (B.active === id) setAddr(); };
   wv.addEventListener('did-navigate', nav); wv.addEventListener('did-navigate-in-page', nav);
@@ -835,6 +856,8 @@ const SNAP_JS = `(()=>{document.querySelectorAll('[data-pid]').forEach(e=>e.remo
  for(const e of els.slice(0,80)){n++;e.setAttribute('data-pid',n);const t=(e.innerText||e.value||e.placeholder||e.getAttribute('aria-label')||e.title||e.name||'').trim().replace(/\\s+/g,' ').slice(0,60);out.push('['+n+'] '+e.tagName.toLowerCase()+(e.type&&e.tagName!=='BUTTON'?'('+e.type+')':'')+' '+JSON.stringify(t));}
  return JSON.stringify({url:location.href,title:document.title,elements:out,text:(document.body?document.body.innerText:'').replace(/\\n{3,}/g,'\\n\\n').slice(0,5000)});})()`;
 async function snapshot(t) {
+  if (t.failed) return `(the page could not be opened: ${t.failed})`;
+  for (let i = 0; i < 6; i++) { let n = 0; try { n = await t.wv.executeJavaScript('(document.body&&document.body.innerText||"").length'); } catch (e) {} if (n > 200) break; await new Promise(r => setTimeout(r, 500)); }
   try { const j = JSON.parse(await t.wv.executeJavaScript(SNAP_JS)); return `URL: ${j.url}\nTitle: ${j.title}\n\n${j.text}\n\nInteractive elements (use click:N or type:N|text):\n${j.elements.join('\n')}`; }
   catch (e) { return '(could not read the page)'; }
 }
@@ -912,7 +935,8 @@ function pickAgent(t) {
   const build = BUILD_RE.test(t) || /(код|программ|скрипт|сайт|html|python|питон|ошибк|баг|code|bug)/i.test(t);
   if (!build && (openIntent(t) || /(найди|поищи|загугли|новост|курс|погод|что такое|кто так|в интернете|расскажи о|узнай|search|find|look up|news|weather)/i.test(t))) return def('browser');
   if (!build && /(файл|папк|переимен|разлож|отсортир|сортир|документ|дубликат|folder|file|rename|organi[sz]e|sort)/i.test(t)) return def('files');
-  return def('coder');
+  if (build) return def('coder');
+  return def('chat');
 }
 function curAgentDef() {
   const id = S.st.agent || 'coder';
@@ -926,7 +950,8 @@ async function askSave(msg, idx, paths) {
 }
 function askHTML(a) {
   if (!a || a.state === 'done') return '';
-  if (a.site) return `<div class="act askcard"><div class="row" style="gap:12px"><span>${esc(a.title)} <span class="mono">${esc(a.files[0])}</span>?</span><span><button class="cb pri" data-act="allow" data-v="${a.id}">${T('allow')}</button><button class="cb" data-act="deny" data-v="${a.id}">${T('deny')}</button><button class="cb" data-act="allowAll" data-v="${a.id}">${T('allowAllReq')}</button></span></div></div>`;
+  if (a.site) return permCard({ type: 'site', id: a.id, host: a.files[0], label: a.title, agent: S.curAgentName });
+  if (a.state === 'ask') return permCard({ type: 'save', id: a.id, files: a.files, agent: S.curAgentName });
   const right = a.state === 'ask' ? `<span><button class="cb pri" data-act="allow" data-v="${a.id}">${T('allow')}</button><button class="cb" data-act="deny" data-v="${a.id}">${T('deny')}</button></span>`
     : `<span class="st ${a.state === 'done' ? 'ok' : ''}">${a.state === 'done' ? T('saved') : T('sDenied')}</span>`;
   return `<div class="act askcard"><div class="row" style="gap:12px"><span>${T('saveToPc')} · ${a.files.length}</span>${right}</div><div style="margin-top:8px;display:flex;flex-direction:column;gap:3px;color:#999">${a.files.map(f => `<span class="mono small">${esc(f)}</span>`).join('')}</div></div>`;
@@ -935,6 +960,7 @@ function cool(signal) {
   return new Promise(res => { const t0 = Date.now(); const tick = () => { if (!S.temps?.hot || signal?.aborted || Date.now() - t0 > 120000) return res(); setTimeout(tick, 2000); }; tick(); });
 }
 async function runAgent(ag, userText, signal) {
+  S.curAgentName = ag.name;
   for (let round = 0; round < 6; round++) {
     if (S.temps?.hot) { const w = { role: 'assistant', content: '', live: true, status: T('cooling') }; S.msgs.push(w); const wi = S.msgs.length - 1; addMsg(wi); await cool(signal); S.msgs.splice(wi, 1); root.querySelector(`.msg[data-i="${wi}"]`)?.remove(); }
     const history = toApi(S.msgs.slice(-24));
@@ -1057,6 +1083,7 @@ function progName(c, text) {
   return { ext, nm: slug(nm) || 'file' };
 }
 async function runChain(text, signal, plan) {
+  S.curAgentName = 'PULSAR IN BROWSER';
   const lang = L() === 'ru' ? 'Russian' : 'English';
   const def = id => ourAgents().find(x => x[0] === id);
   const ids = ['accept', (plan.urls.length || plan.research || plan.refs) && 'analyze', plan.multi && !plan.edit && 'plan', 'code', 'review', 'save'].filter(Boolean);
@@ -1338,6 +1365,7 @@ root.addEventListener('click', async e => {
     case 'cext': if (S.editFile) P.ws.openFile(S.editFile); break;
     case 'attach': { const f = await P.pickFiles(); addAttach(f); break; }
     case 'unattach': S.attach.splice(+v, 1); drawAttach(); break;
+    case 'allowSite': { const h = b.dataset.h; if (h) await save({ trustedHosts: [...new Set([...(S.st.trustedHosts || []), h])] }); const r = S.pending[v]; delete S.pending[v]; r && r(true); Sound.tick(1500); break; }
     case 'allowAll': { S.allowAll = true; const r = S.pending[v]; delete S.pending[v]; r && r(true); break; }
     case 'addModel': { const m = await P.pickModel(); if (m) { const id = 'custom-' + (slug(m.name) || Date.now()); await save({ customModels: [...(S.st.customModels || []).filter(x => x.id !== id), { id, name: m.name, path: m.path, sizeGB: m.sizeGB }] }); S.local.add(id); Sound.done(); renderMain(); } break; }
     case 'delCustom': await save({ customModels: (S.st.customModels || []).filter(x => x.id !== v) }); S.local.delete(v); if (S.running === v) { await P.stop(); S.running = null; } renderNav(); renderMain(); break;
@@ -1400,7 +1428,7 @@ function applyTheme() { document.documentElement.classList.toggle('light', S.st.
 (async () => {
   S.st = await P.getSettings(); applyTheme();
   if (S.st.apis) await save({ apis: [] });
-  if (S.st.agent === 'team' || !['coder', 'files', 'browser'].includes(S.st.agent || 'coder')) await save({ agent: 'coder' });
+  if (S.st.agent === 'team' || !['chat', 'coder', 'files', 'browser'].includes(S.st.agent || 'coder')) await save({ agent: 'chat' });
   if (S.st.lang) document.documentElement.lang = S.st.lang;
   if (!S.st.lang) langScreen(); else intro();
 })();

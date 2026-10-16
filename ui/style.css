@@ -215,3 +215,47 @@ html.light webview,html.light img,html.light video{filter:invert(1) hue-rotate(1
 .screen.two .panel.open{width:calc((100% - 240px - 440px) / 2)}
 .screen.two .bshell{min-width:300px}
 .mid{min-width:420px}
+/* ---- permission card ---- */
+.perm{display:flex;gap:16px;margin:12px 0;padding:18px 20px;border:1px solid #2c2c2c;border-radius:20px;background:linear-gradient(180deg,#0d0d0d,#070707);white-space:normal;box-shadow:0 20px 60px rgba(0,0,0,.45);animation:permIn .55s cubic-bezier(.2,.9,.25,1.1) both;position:relative;overflow:hidden}
+.perm:before{content:'';position:absolute;inset:0;border-radius:20px;padding:1px;background:linear-gradient(120deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);background-size:250% 100%;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:permGlow 2.8s linear infinite;pointer-events:none}
+.perm-ic{width:40px;height:40px;flex:none;border-radius:12px;background:#fff;color:#000;display:flex;align-items:center;justify-content:center}
+.perm-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.perm-who{font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.12em;color:#777}
+.perm-t{font-size:17px;font-weight:400;color:#fff}
+.perm-host{display:flex;align-items:center;gap:10px;font-size:14px;color:#ddd}
+.perm-av{width:24px;height:24px;border-radius:7px;background:#1f1f1f;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500}
+.perm-files{display:flex;flex-direction:column;gap:4px}
+.perm-file{display:flex;align-items:center;gap:8px;color:#bbb;font-size:13px}
+.perm-d{font-size:13px;color:#777;line-height:1.5}
+.perm-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.pbtn{height:38px;padding:0 18px;border-radius:19px;border:1px solid #333;background:#141414;color:#eee;font-size:13px;cursor:pointer;transition:transform .2s cubic-bezier(.2,.8,.2,1),background .2s,border-color .2s}
+.pbtn:hover{transform:translateY(-1px);background:#1c1c1c;border-color:#444}.pbtn:active{transform:scale(.96)}
+.pbtn.pri{background:#fff;color:#000;border-color:#fff}.pbtn.pri:hover{background:#e8e8e8}
+.pbtn.ghost{background:transparent;color:#999;border-color:transparent}.pbtn.ghost:hover{color:#fff;background:#141414}
+.perm-link{align-self:flex-start;border:none;background:none;color:#666;font-size:12px;cursor:pointer;padding:2px 0;text-decoration:underline;text-underline-offset:3px;transition:color .2s}.perm-link:hover{color:#ccc}
+@keyframes permIn{0%{opacity:0;transform:translateY(14px) scale(.97);filter:blur(4px)}100%{opacity:1;transform:none;filter:none}}
+@keyframes permGlow{0%{background-position:150% 0}100%{background-position:-100% 0}}
+/* ---- motion polish ---- */
+main.swap>*{animation:viewIn .5s cubic-bezier(.2,.8,.2,1) both}
+@keyframes viewIn{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:none}}
+.msg.me{animation:meIn .45s cubic-bezier(.2,.9,.25,1.1) both}
+@keyframes meIn{0%{opacity:0;transform:translateX(18px) scale(.98)}100%{opacity:1;transform:none}}
+.toast{animation:toastIn .5s cubic-bezier(.2,.9,.25,1.15) both;transition:opacity .3s,transform .3s}
+.toast.out{opacity:0;transform:translateX(-50%) translateY(10px)}
+@keyframes toastIn{0%{opacity:0;transform:translateX(-50%) translateY(16px) scale(.96)}100%{opacity:1;transform:translateX(-50%)}}
+.composer{transition:border-color .3s,box-shadow .4s}
+.composer:focus-within{box-shadow:0 0 0 4px rgba(255,255,255,.04),0 20px 50px rgba(0,0,0,.4)}
+.nav{position:relative;transition:background .3s,color .3s,transform .25s cubic-bezier(.2,.8,.2,1)}
+.nav:active{transform:scale(.97)}
+.nav.on{animation:navOn .4s cubic-bezier(.2,.9,.25,1.1)}
+@keyframes navOn{0%{transform:scale(.96)}100%{transform:none}}
+.cstep{transition:all .5s cubic-bezier(.2,.9,.25,1.1)}
+.cstep.done{animation:stepDone .5s cubic-bezier(.2,.9,.25,1.2)}
+@keyframes stepDone{0%{transform:scale(.85)}60%{transform:scale(1.06)}100%{transform:none}}
+.cline{position:relative;overflow:hidden}.cline.done{background:#fff;animation:lineFill .5s cubic-bezier(.4,0,.2,1)}
+@keyframes lineFill{0%{transform:scaleX(0);transform-origin:left}100%{transform:scaleX(1)}}
+.panel.open .bshell{animation:shellIn .6s .1s cubic-bezier(.2,.8,.2,1) both}
+@keyframes shellIn{0%{opacity:0;transform:translateX(16px)}100%{opacity:1;transform:none}}
+.card,.btn,.chip,.ibtn,.cb{will-change:transform}
+.hitem{transition:background .25s,color .25s,padding .25s}.hitem:hover{padding-left:20px}
+@media (prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
