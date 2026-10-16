@@ -1,6 +1,6 @@
 {
   "name": "pulsar",
-  "version": "0.11.2",
+  "version": "0.11.3",
   "description": "PULSAR — free local AI agents for your PC",
   "main": "main.js",
   "keywords": [],

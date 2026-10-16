@@ -723,15 +723,22 @@ async function execAction(a, repaint, auto) {
 
 // --- intents: what the user clearly wants, done even if the model forgets ---
 const SITES = [[/википеди|wikipedia/, 'https://ru.wikipedia.org'], [/ютуб|youtube/, 'https://www.youtube.com'], [/гугл|google/, 'https://www.google.com'],
-  [/яндекс|yandex/, 'https://ya.ru'], [/вконтакт|\bвк\b|\bvk\b/, 'https://vk.com'], [/гитхаб|github/, 'https://github.com'], [/хабр|habr/, 'https://habr.com'],
+  [/яндекс|yandex/, 'https://ya.ru'], [/вконтакт|(^|\s)вк(\s|$)|\bvk\b/, 'https://vk.com'], [/гитхаб|github/, 'https://github.com'], [/хабр|habr/, 'https://habr.com'],
   [/авито|avito/, 'https://www.avito.ru'], [/озон|ozon/, 'https://www.ozon.ru'], [/вайлдберр|wildberries/, 'https://www.wildberries.ru'],
+  [/тик\s*-?\s*ток|тикток|tik\s*tok/, 'https://www.tiktok.com'], [/инст(аграм|у|а)|instagram/, 'https://www.instagram.com'], [/твиттер|twitter|\bx\.com/, 'https://x.com'],
+  [/реддит|reddit/, 'https://www.reddit.com'], [/твич|twitch/, 'https://www.twitch.tv'], [/рутуб|rutube/, 'https://rutube.ru'], [/дзен|dzen/, 'https://dzen.ru'],
+  [/(^|\s)стим(\s|$)|steam/, 'https://store.steampowered.com'], [/дискорд|discord/, 'https://discord.com/app'], [/спотиф|spotify/, 'https://open.spotify.com'],
+  [/почт[ау] (на )?(мейл|mail)|mail\.ru|мейл/, 'https://mail.ru'], [/гмейл|gmail/, 'https://mail.google.com'], [/пинтерест|pinterest/, 'https://www.pinterest.com'],
+  [/одноклассник|(^|\s)ок(\s|$)/, 'https://ok.ru'], [/яндекс музык/, 'https://music.yandex.ru'], [/яндекс карт|карты/, 'https://yandex.ru/maps'], [/переводчик/, 'https://translate.yandex.ru'],
   [/телеграм|telegram/, 'https://web.telegram.org'], [/кинопоиск/, 'https://www.kinopoisk.ru'], [/погод/, 'https://yandex.ru/pogoda']];
 function openIntent(t) {
   const s = t.toLowerCase();
-  if (!/(открой|открыть|откройте|зайди|перейди|покажи сайт|\bopen\b|go to)/.test(s)) return null;
+  if (!/(открой|открыть|откройте|открывай|зайди|перейди|запусти|включи|покажи сайт|\bopen\b|go to)/.test(s)) return null;
   const u = s.match(/https?:\/\/\S+/); if (u) return u[0];
   const d = s.match(/\b([a-z0-9-]+\.)+(ru|com|org|net|io|dev|рф|su|me|app|info|xyz|tv)(\/\S*)?/); if (d) return 'https://' + d[0];
   for (const [re, url] of SITES) if (re.test(s)) return url;
+  // "открой его / ты открой / открой первую" -> the site from the last answer
+  if (S.lastLinks && S.lastLinks.length && /(открой|открыть|open)\s*(его|её|ее|это|эту|этот|первую|первый|ссылку|сайт|it|that|the first)?\s*[.!?]*$/.test(s.replace(/(^|\s)(ты|ну|давай|а|мне|пожалуйста|плиз)(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim())) return S.lastLinks[0];
   return null;
 }
 const SAVE_RE = /(сохрани|сохранить|сохраняй|на пк|на компьютер|на комп|в файл|создай файл|запиши|\bsave\b|to (a )?file)/i;
@@ -963,8 +970,12 @@ const MEM_RULE = '\nIf the user tells you something lasting about themselves (na
 const sysMsg = (prompt, tools, mem) => ({ role: 'system', content: prompt + (tools ? '\n' + TOOLS_PROMPT : '') + (mem ? MEM_RULE : '') + memText() + `\nWorkspace folder: ${S.ws || ''}` });
 const MEM_RE = /\[\[\s*(remember|forget|запомни|забудь)\s*:\s*([^\]]+?)\s*\]\]/gi;
 const stripMem = s => (s || '').replace(MEM_RE, '').replace(/\[\[[^\]]*\]?$/, '').trimEnd();
+const NAME_RE = /(?:меня зовут|моё имя|мое имя|зови меня|my name is|call me)\s+([A-Za-zА-Яа-яЁё-]{2,20})|меня\s+([A-Za-zА-Яа-яЁё-]{2,20})\s+зовут/i;
 async function applyMemory(msg) {
   const add = [], del = [];
+  const lastUser = [...S.msgs].reverse().find(m => m.role === 'user');
+  const nm = lastUser && (lastUser.shown || '').match(NAME_RE);
+  if (nm) { const w = nm[1] || nm[2]; const n = w[0].toUpperCase() + w.slice(1).toLowerCase(); const lbl = L() === 'ru' ? 'Имя пользователя: ' : 'User name: '; const cur = (S.st.memory || []).filter(x => !x.startsWith(lbl)); if (!(S.st.memory || []).includes(lbl + n)) { await save({ memory: [...cur, lbl + n] }); add.push(lbl + n); } }
   for (const [, k, v] of (msg.content || '').matchAll(MEM_RE)) (/^(forget|забудь)/i.test(k) ? del : add).push(v.trim());
   if (!add.length && !del.length) return;
   msg.content = stripMem(msg.content);
@@ -1018,7 +1029,7 @@ async function runAgent(ag, userText, signal) {
         await stream([{ role: 'system', content: ag.prompt + ' Continue the answer exactly where it stopped. Do not repeat anything.' }, { role: 'user', content: userText },
           { role: 'assistant', content: msg.content.slice(-6000) }], signal, c => { msg.content += c; paint(idx); }, null, meta);
       }
-    } finally { msg.live = false; msg.status = null; await applyMemory(msg).catch(() => {}); paint(idx); }
+    } finally { msg.live = false; msg.status = null; msg.content = (msg.content || '').split('\n').filter(l => !/(блок\w*|block)\s*`*\s*(open|search|file|run|read|list|click|type)\s*:?/i.test(l)).join('\n').trimEnd(); await applyMemory(msg).catch(() => {}); paint(idx); }
     if (!ag.tools) return;
     const acts = parseActions(noThink(msg.content));
     if (!acts.length) { if (SAVE_RE.test(userText)) await applyAuto(msg, idx, userText, ag.id); return; }
@@ -1302,7 +1313,12 @@ async function sendMsg() {
   const files = S.attach.splice(0); drawAttach();
   const text = (typed || T('attachAsk')) + files.map(f => `\n\n[Attached file: ${f.name}${f.cut ? ' (cut)' : ''}]\n\`\`\`\n${f.text}\n\`\`\``).join('');
   S.allowAll = false; S.allowedHosts = new Set();
+  if (!files.length && /^(открой|открыть|покажи|open)?\s*(браузер|browser)\s*(открой|открыть|open)?[.!]*$/i.test(typed)) {
+    ta.value = ''; S.msgs.push({ role: 'user', content: typed, shown: typed }); addMsg(S.msgs.length - 1);
+    if (!S.panel) openPanel(); S.msgs.push({ role: 'assistant', content: T('browserOpened') }); addMsg(S.msgs.length - 1); Sound.done(); saveChat().catch(() => {}); return;
+  }
   const url = files.length ? null : openIntent(typed);
+  if (url) S.lastLinks = [url];
   if (!S.running && !url) { toast(T('chatNoModel')); return; }
   ta.value = ''; ta.style.height = 'auto';
   S.msgs.push({ role: 'user', content: text, shown: typed, files: files.map(f => ({ name: f.name, size: f.size })) }); addMsg(S.msgs.length - 1);
@@ -1330,7 +1346,13 @@ async function sendMsg() {
         const m = { role: 'assistant', content: '', extra: [{ id: 'a' + (++actSeq), kind: 'search', arg: text.slice(0, 120), state: 'wait' }] };
         S.msgs.push(m); const i = S.msgs.length - 1; addMsg(i);
         const res = await execAction(m.extra[0], () => paint(i), false);
-        S.msgs.push({ role: 'tool', content: res + '\nUse these results, cite links. You may open a link with an open: block to read more.' }); addMsg(S.msgs.length - 1);
+        const links = [...String(res).matchAll(/https?:\/\/[^\s)\]>"']+/g)].map(x => x[0]);
+        if (links.length) S.lastLinks = links;
+        if (links.length && /(открой|открыть|зайди|перейди|запусти|включи|\bopen\b)/i.test(typed)) {
+          const o = { id: 'a' + (++actSeq), kind: 'open', arg: links[0], state: 'wait' }; m.extra.push(o);
+          const page = await execAction(o, () => paint(i), false);
+          S.msgs.push({ role: 'tool', content: `Opened ${links[0]} in the built-in browser.\n${String(page).slice(0, 3000)}\nTell the user in one or two short sentences that the site is open in the browser on the right. Do not list links.` }); addMsg(S.msgs.length - 1);
+        } else S.msgs.push({ role: 'tool', content: res + '\nAnswer from these results and cite the best links. If you need more, open a link yourself. Never tell the user about blocks or tools.' }); addMsg(S.msgs.length - 1);
       }
       await runAgent(ag, text, ctl.signal);
     }
