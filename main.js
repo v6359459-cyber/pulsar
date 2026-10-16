@@ -506,7 +506,7 @@ app.whenReady().then(() => {
   if (!autoUpdater || !app.isPackaged) return;
   autoUpdater.autoDownload = true; autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.on('update-available', i => send('update', { state: 'downloading', version: i.version, percent: 0 }));
-  autoUpdater.on('download-progress', p => send('update', { state: 'downloading', percent: Math.round(p.percent) }));
+  autoUpdater.on('download-progress', p => send('update', { state: 'downloading', percent: Math.round(p.percent), got: p.transferred, total: p.total, speed: p.bytesPerSecond }));
   autoUpdater.on('update-downloaded', i => send('update', { state: 'ready', version: i.version }));
   autoUpdater.on('error', e => { try { fs.appendFileSync(path.join(DATA(), 'app.log'), `[update] ${e.message}\n`); } catch {} });
   setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 3600 * 1000);

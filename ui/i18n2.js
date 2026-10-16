@@ -182,3 +182,6 @@ Object.assign(I18N.ru, { catHelp: 'Ускорители', catHelpD: 'не зап
 Object.assign(I18N.en, { catHelp: 'Boosters', catHelpD: 'they do not run alone, they help a big model answer faster', helperTag: 'Helper', helperD: 'Speeds up 1.5–2×:', helperOn: 'Helping · on', helperOff: 'Off',
   specOn: 'Booster on — faster answers', specRestart: 'Restart the model to apply', oSpec: 'Boosters', oSpecD: 'A small model drafts for the big one — faster answers',
   oMemory: 'HELLO PULSAR memory', oMemoryD: 'What the agent remembers about you between chats', memSaved: 'Remembered:', memForgot: 'Forgot' });
+
+Object.assign(I18N.ru, { mb: 'МБ', updWait: 'Установка займёт до минуты, PULSAR откроется сам', updDone: v => `PULSAR обновлён до ${v}` });
+Object.assign(I18N.en, { mb: 'MB', updWait: 'Installing takes up to a minute, PULSAR will reopen by itself', updDone: v => `PULSAR updated to ${v}` });

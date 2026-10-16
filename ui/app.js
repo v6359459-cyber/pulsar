@@ -136,16 +136,17 @@ async function afterIntro() {
   if (S._afterIntro) return; S._afterIntro = true;
   await updateStep();
   if (!S.st.hw) scanScreen(); else appScreen();
+  if (S.st.justUpdated) { const v = S.st.justUpdated; await save({ justUpdated: null }); setTimeout(() => toast(T('updDone')(v)), 900); }
 }
 async function updateStep() {
-  root.innerHTML = `<div class="screen center" style="flex-direction:column;gap:26px"><div style="position:relative;width:90px;height:90px"><div class="ring"></div><div class="ring" style="animation-delay:1.06s"></div><div class="led" style="position:absolute;top:50%;left:50%;width:6px;height:6px;margin:-3px;border-radius:3px;background:#fff"></div></div>
-    <div class="fu" id="updtext" style="font-size:20px;font-weight:300">${T('updChecking')}</div><div class="track fu" style="width:260px;opacity:0" id="updtrack"><div id="updbar" style="width:0%"></div></div></div>`;
+  root.innerHTML = `<div class="screen center" style="flex-direction:column;gap:26px"><div style="position:relative;width:90px;height:90px;margin:40px 0 50px"><div class="ring"></div><div class="ring" style="animation-delay:1.06s"></div><div class="led" style="position:absolute;top:50%;left:50%;width:6px;height:6px;margin:-3px;border-radius:3px;background:#fff"></div></div>
+    <div class="fu updt" id="updtext">${T('updChecking')}</div><div class="track fu" style="width:320px;opacity:0;transition:opacity .5s" id="updtrack"><div id="updbar" style="width:0%;transition:width .4s"></div></div><div class="mono updsub" id="updsub"></div></div>`;
   const r = await Promise.race([P.checkUpdate().catch(() => ({})), new Promise(res => setTimeout(() => res({}), 9000))]);
   if (!r || !r.available) return;
   document.getElementById('updtext').textContent = T('updUpdating')(r.version);
   document.getElementById('updtrack').style.opacity = 1;
   const ok = await new Promise(res => { const t0 = Date.now(); const tick = () => { if (S.update && S.update.state === 'ready') return res(true); if (Date.now() - t0 > 15 * 60000) return res(false); setTimeout(tick, 500); }; tick(); });
-  if (ok) { document.getElementById('updtext').textContent = T('updRestart'); await new Promise(r => setTimeout(r, 800)); P.installUpdate(); await new Promise(() => {}); }
+  if (ok) { await save({ justUpdated: r.version }); document.getElementById('updtext').textContent = T('updRestart'); document.getElementById('updsub').textContent = T('updWait'); await new Promise(r => setTimeout(r, 800)); P.installUpdate(); await new Promise(() => {}); }
 }
 
 async function scanScreen() {
@@ -1461,7 +1462,8 @@ P.onTemps(t => {
   if (!t.hot && was) toast(T('coolToast'));
   if (t.max >= (t.limit || 80) + 10 && S.streaming) { S.streaming.abort(); toast(T('tooHot')(Math.round(t.max))); }
 });
-P.onUpdate(u => { S.update = { ...(S.update || {}), ...u }; const ub = document.getElementById('updbar'); if (ub && u.percent != null) ub.style.width = u.percent + '%'; if ($('#nav')) renderNav(); if (u.state === 'ready') toast(T('updReady')(u.version)); });
+P.onUpdate(u => { S.update = { ...(S.update || {}), ...u }; const ub = document.getElementById('updbar'); if (ub && u.percent != null) ub.style.width = u.percent + '%';
+  const us = document.getElementById('updsub'); if (us && u.total) { const mb = x => (x / 1048576).toFixed(0); us.textContent = `${u.percent}% · ${mb(u.got)} / ${mb(u.total)} ${T('mb')} · ${(u.speed / 1048576).toFixed(1)} ${T('mb')}/s`; } if ($('#nav')) renderNav(); if (u.state === 'ready') toast(T('updReady')(u.version)); });
 P.onLoad(l => {
   const was = S.busy; S.busy = l.busy ? l.name : null;
   if (S.busy && S.busy !== was && S.running) toast(T('busy')(S.busy));

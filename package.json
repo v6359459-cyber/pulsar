@@ -1,6 +1,6 @@
 {
   "name": "pulsar",
-  "version": "0.11.1",
+  "version": "0.11.2",
   "description": "PULSAR — free local AI agents for your PC",
   "main": "main.js",
   "keywords": [],
@@ -48,6 +48,7 @@
     },
     "nsis": {
       "oneClick": false,
+      "differentialPackage": true,
       "allowToChangeInstallationDirectory": true,
       "perMachine": false,
       "createDesktopShortcut": true,

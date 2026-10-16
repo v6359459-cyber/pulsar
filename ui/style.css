@@ -240,9 +240,9 @@ main.swap>*{animation:viewIn .5s cubic-bezier(.2,.8,.2,1) both}
 @keyframes viewIn{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:none}}
 .msg.me{animation:meIn .45s cubic-bezier(.2,.9,.25,1.1) both}
 @keyframes meIn{0%{opacity:0;transform:translateX(18px) scale(.98)}100%{opacity:1;transform:none}}
-.toast{animation:toastIn .5s cubic-bezier(.2,.9,.25,1.15) both;transition:opacity .3s,transform .3s}
-.toast.out{opacity:0;transform:translateX(-50%) translateY(10px)}
-@keyframes toastIn{0%{opacity:0;transform:translateX(-50%) translateY(16px) scale(.96)}100%{opacity:1;transform:translateX(-50%)}}
+.toast{left:0!important;right:0;margin:0 auto;width:fit-content;text-align:center;transform:none;animation:toastIn .5s cubic-bezier(.2,.9,.25,1.15) both;transition:opacity .3s,transform .3s}
+.toast.out{opacity:0;transform:translateY(10px)}
+@keyframes toastIn{0%{opacity:0;transform:translateY(16px) scale(.96)}100%{opacity:1;transform:none}}
 .composer{transition:border-color .3s,box-shadow .4s}
 .composer:focus-within{box-shadow:0 0 0 4px rgba(255,255,255,.04),0 20px 50px rgba(0,0,0,.4)}
 .nav{position:relative;transition:background .3s,color .3s,transform .25s cubic-bezier(.2,.8,.2,1)}
@@ -262,3 +262,7 @@ main.swap>*{animation:viewIn .5s cubic-bezier(.2,.8,.2,1) both}
 .memnote{display:inline-flex;align-items:center;gap:8px;margin-top:12px;padding:6px 12px;border:1px solid #222;border-radius:14px;font-size:12px;color:#888;animation:permIn .5s cubic-bezier(.2,.9,.25,1.1) both}
 .memnote svg{color:#fff}
 .helper{border-style:dashed}
+
+.updt{font-size:22px;font-weight:300;text-align:center}
+.updsub{font-size:12px;color:#777;text-align:center;min-height:16px}
+.hwbox.upd{text-align:center}
