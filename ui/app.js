@@ -334,7 +334,9 @@ P.onProgress(({ id, got, total }) => {
 async function autoDraft(id, dr) {
   toast(T('draftAuto').replace('{d}', findM(dr).name).replace('{m}', findM(id).name));
   await downloadModel(dr);
-  if (S.local.has(dr) && S.running === id && !S.streaming && !S.busy) startModel(id);
+  if (!S.local.has(dr)) return;
+  while (S.running === id && S.streaming) await new Promise(r => setTimeout(r, 2000));
+  if (S.running === id && !S.spec) { toast(T('bApply')); startModel(id); }
 }
 async function runModel(id) { S.tab = 'chat'; renderNav(); renderMain(); return startModel(id); }
 async function startModel(id) {
@@ -346,7 +348,7 @@ async function startModel(id) {
   S.runPlan = p;
   const r = await P.start({ id, path: m.path, ngl: p.ngl, ctx: p.ctx, threads: p.threads, gpu: p.ngl > 0, layers: m.layers, slots: p.slots, cpuMoe: p.cpuMoe, draft: useDraft ? dr : null });
   if (!r.ok) { S.engine = { stage: 'error', error: r.error }; toast(T('eError') + ': ' + (r.error || '').slice(0, 300)); if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = engineText(); } return false; }
-  S.running = id; S.slots = r.slots || 1; S.engine = { stage: 'ready', kind: r.kind }; S.spec = !!r.spec; showBoost(); if (!S.sel || S.sel === 'local') S.sel = 'local';
+  S.running = id; S.slots = r.slots || 1; S.engine = { stage: 'ready', kind: r.kind }; S.spec = !!r.spec; S.specTried = useDraft; S.specErr = r.specErr || ''; showBoost(); if (!S.sel || S.sel === 'local') S.sel = 'local';
   renderNav(); if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = ''; const mp = $('#mpill'); if (mp) mp.textContent = m.name; } else renderMain();
   Sound.done();
   const sk = id + (r.spec ? '+spec' : '');
@@ -379,12 +381,13 @@ function boostState() {
   if (S.dl[id]) { const x = S.dl[id]; return { text: `${T('bLoading')} ${x.total ? Math.floor(x.got / x.total * 100) : 0}%`, tip: d.name }; }
   if (!draftOn(m)) return { text: T('bOff'), tip: T('bOffD') };
   if (S.runPlan && !S.runPlan.draftRoom) return { text: T('bNoRoom'), tip: T('bNoRoomD') };
-  return { text: T('bFail'), tip: T('bFailD') };
+  if (S.local.has(id) && !S.specTried) return { text: T('bReady'), tip: T('bReadyD'), click: true };
+  return { text: T('bFail'), tip: T('bFailD') + (S.specErr ? '\n' + S.specErr : ''), click: true };
 }
 function showBoost() {
   const el = $('#bpill'); if (!el) return; const b = boostState();
   if (!b) { el.style.display = 'none'; return; }
-  el.style.display = ''; el.classList.toggle('on', !!b.on); el.title = b.tip || '';
+  el.style.display = ''; el.classList.toggle('on', !!b.on); el.title = b.tip || ''; el.dataset.act = b.click ? 'boostRetry' : ''; el.style.cursor = b.click ? 'pointer' : '';
   el.innerHTML = `<span class="dot ${b.on ? 'led' : ''}"></span>${esc(b.text)}`;
 }
 function showSpeed() { const el = $('#spill'); if (el) { el.textContent = speedText(); el.style.display = el.textContent ? '' : 'none'; } }
@@ -1497,16 +1500,6 @@ async function sendMsg() {
   }
   S.lastAgent = chain ? (plan.urls.length || plan.research ? 'PULSAR IN BROWSER → PULSAR CODE' : 'PULSAR CODE ×2') : ag.name; S.lastAgentId = chain ? 'coder' : ag.id;
   const pill = $('#apill'); if (pill && auto) { pill.textContent = S.lastAgent; pill.classList.remove('flash'); void pill.offsetWidth; pill.classList.add('flash'); }
-  // auto also picks the downloaded model that fits this request best
-  if (auto && S.running && !url) {
-    const kind = chain || ag.id === 'coder' ? 'code' : ag.id === 'chat' ? taskKind(text) : 'general';
-    const cur = findM(S.running), best = pickModel(kind);
-    if (best && cur && best.id !== S.running && !cur.tags.includes(kind) && best.tags.includes(kind)) {
-      const prev = S.running; toast(T('switching') + ' ' + best.name);
-      if (!(await startModel(best.id))) await startModel(prev);
-      const mp = $('#mpill'); if (mp && S.running) mp.textContent = findM(S.running).name;
-    }
-  }
   try {
     if (chain && S.running) await runChain(text, ctl.signal, plan);
     else if (url) {
@@ -1587,6 +1580,7 @@ root.addEventListener('click', async e => {
       await P.stop(); S.running = null; S.engine = null; S.msgs = []; S.chatId = null; S.lastProject = null; S._lastTab = null;
       renderNav(); renderMain(); toast(T('ended')); break;
     case 'send': sendMsg(); break;
+    case 'boostRetry': if (S.running && !S.streaming) { const id = S.running; toast(T('bApply')); startModel(id); } break;
     case 'jump': { S.follow = true; const box = $('#msgs'); if (box) { box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' }); S._auto = true; } showJump(); break; }
     case 'stop': S.streaming?.abort(); Object.values(S.pending).forEach(r => r(false)); S.pending = {}; break;
     case 'allow': case 'deny': { const r = S.pending[v]; delete S.pending[v]; r && r(b.dataset.act === 'allow'); break; }

@@ -210,14 +210,14 @@ ipcMain.handle('engine:start', async (_e, opts) => {
     tries.push(['vulkan', { ...opts, ngl: opts.ngl === 999 ? Math.floor((opts.layers || 32) * 0.6) : Math.floor((opts.ngl || 0) * 0.6), ctx: 4096 }]);
   }
   tries.push(['cpu', { ...opts, slots: 1, ctx: Math.min(opts.ctx || 4096, 4096) }]);
-  let lastErr;
+  let lastErr, specErr = '';
   for (const [kind, o] of tries) {
     try {
       await launch(kind, o);
       serverInfo = { id: opts.id, kind, port: PORT, ngl: o.ngl, slots: o.slots || 1 };
       send('engine:status', { stage: 'ready', kind });
-      return { ok: true, kind, port: PORT, slots: o.slots || 1, spec: !!o.draft };
-    } catch (e) { lastErr = e; }
+      return { ok: true, kind, port: PORT, slots: o.slots || 1, spec: !!o.draft, specErr };
+    } catch (e) { lastErr = e; if (o.draft) specErr = String(e.message || e).slice(0, 300); }
   }
   send('engine:status', { stage: 'error' });
   return { ok: false, error: String(lastErr && lastErr.message || lastErr) };
