@@ -418,7 +418,9 @@ function viewOpt() {
     ['ctx', T('oCtx'), T('oCtxD'), ctxv],
     ['threads', T('oThreads'), T('oThreadsD'), o.threads === 'all' ? `${S.st.hw?.threads || '?'}` : `${T('auto')} · ${S.st.hw?.cores || '?'}`],
     ['load', T('oLoad'), T('oLoadD'), S.st.load !== false ? T('on') : T('off')],
-    ['heat', T('oHeat'), T('oHeatD'), S.st.heat !== false ? `${T('on')} · ${S.st.heatLimit || 80}°` : T('off')],
+    ['heat', T('oHeat'), T('oHeatD'), S.st.heat !== false ? T('on') : T('off')],
+    ['heatGpu', T('oHeatGpu'), T('oHeatGpuD'), `${S.st.gpuLimit || 75}°C`],
+    ['heatCpu', T('oHeatCpu'), T('oHeatCpuD'), `${S.st.cpuLimit || 75}°C`],
     ['engine', T('oEngine'), T('oEngineD'), S.st.engine === 'cpu' ? 'CPU' : 'Vulkan'],
     ['sound', T('oSound'), T('oSoundD'), S.st.sound !== false ? T('on') : T('off')],
     ['theme', T('oTheme'), T('oThemeD'), S.st.theme === 'light' ? T('light') : T('dark')],
@@ -449,7 +451,8 @@ async function toggleOpt(k) {
   if (k === 'trusted') await save({ trustedHosts: [] });
   if (k === 'memory') await save({ memory: [] });
   if (k === 'spec') await save({ spec: S.st.spec === false });
-  if (k === 'heat') { const seq = [[true, 80], [true, 75], [true, 85], [false, 80]]; const i = seq.findIndex(x => x[0] === (S.st.heat !== false) && x[1] === (S.st.heatLimit || 80)); const n = seq[(i + 1) % seq.length]; await save({ heat: n[0], heatLimit: n[1] }); }
+  if (k === 'heatGpu' || k === 'heatCpu') { const key = k === 'heatGpu' ? 'gpuLimit' : 'cpuLimit', seq = [65, 70, 75, 80, 85, 90]; await save({ [key]: seq[(seq.indexOf(S.st[key] || 75) + 1) % seq.length] }); Sound.tick(1500); renderMain(); return; }
+  if (k === 'heat') { await save({ heat: S.st.heat === false }); Sound.tick(1500); renderMain(); return; }
   if (k === 'lang') { await save({ lang: L() === 'ru' ? 'en' : 'ru' }); renderNav(); }
   await save({ opt: o }); Sound.tick(1500); renderMain();
 }
@@ -726,8 +729,11 @@ let reqSeq = 0;
 function stream(messages, signal, onDelta, extra, meta) {
   const t = target(); const id = 'r' + (++reqSeq);
   return new Promise((resolve, reject) => {
-    let buf = '', all = '', thinking = false;
-    const emit = c => { all += c; onDelta && onDelta(c); };
+    let buf = '', all = '', thinking = false, looped = false, checked = 0;
+    const emit = c => {
+      if (looped) return; all += c; onDelta && onDelta(c);
+      if (all.length - checked > 200) { checked = all.length; const cut = loopCut(all); if (cut) { looped = true; all = all.slice(0, -cut); if (meta) meta.loopCut = cut; else S.loopCut = cut; P.chatAbort(id); } }
+    };
     const stop = () => P.chatAbort(id);
     if (signal) { if (signal.aborted) return reject(new DOMException('aborted', 'AbortError')); signal.addEventListener('abort', stop, { once: true }); }
     live[id] = {
@@ -747,12 +753,27 @@ function stream(messages, signal, onDelta, extra, meta) {
       end(err) {
         delete live[id]; if (signal) signal.removeEventListener('abort', stop);
         if (thinking) { thinking = false; emit('</think>'); }
-        if (err) reject(err === 'aborted' ? new DOMException('aborted', 'AbortError') : new Error(err)); else resolve(all);
+        if (err && !(looped && err === 'aborted' && !(signal && signal.aborted))) reject(err === 'aborted' ? new DOMException('aborted', 'AbortError') : new Error(err)); else { if (looped && meta) meta.finish = 'loop'; resolve(all); }
       }
     };
     S.lastFinish = null;
-    P.chat(id, t.base + '/chat/completions', t.key, { model: t.model, stream: true, messages, temperature: 0.4, ...(extra || {}) });
+    P.chat(id, t.base + '/chat/completions', t.key, { model: t.model, stream: true, messages, temperature: 0.4, repeat_penalty: 1.08, repeat_last_n: 256, ...(extra || {}) });
   });
+}
+// the model got stuck: the same piece (40+ chars) repeats 4 times in a row at the end -> how much to cut
+function loopCut(t) {
+  const tail = t.slice(-2400);
+  for (let p = 40; p * 4 <= tail.length && p <= 600; p++) {
+    const a = tail.slice(-p); if (!a.trim()) continue;
+    if (tail.slice(-2 * p, -p) === a && tail.slice(-3 * p, -2 * p) === a && tail.slice(-4 * p, -3 * p) === a) {
+      let k = 4; while ((k + 1) * p <= t.length && t.slice(-(k + 1) * p, -k * p) === a) k++;
+      return (k - 1) * p;
+    }
+  }
+  // the same line over and over (short lines)
+  const lines = tail.split('\n').filter(x => x.trim()); const last = lines[lines.length - 1];
+  if (last && last.trim().length > 3 && lines.length >= 8 && lines.slice(-8).every(x => x === last)) { let n = 0; for (let i = lines.length - 1; i >= 0 && lines[i] === last; i--) n++; return (n - 1) * (last.length + 1); }
+  return 0;
 }
 const noThink = s => s.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim();
 const REFUSAL = /(не (имею|могу|умею)[^.\n]{0,80}(доступ|сохран|открыва|браузер|файл|компьютер|пк|интернет))|(у меня нет[^.\n]{0,40}(доступ|браузер))|(я (всего лишь|лишь|только)? ?текстов)|(I (can't|cannot|don't|do not)[^.\n]{0,80}(access|save|open|browse|file|computer|internet))|(text-based (AI|assistant))/i;
@@ -1148,7 +1169,7 @@ function cool(signal) {
 }
 async function runAgent(ag, userText, signal) {
   S.curAgentName = ag.name;
-  const doneActs = new Set();
+  const doneActs = new Set(), seen = {}; let lastSig = '';
   for (let round = 0; round < (ag.id === 'browser' ? 10 : 6); round++) {
     if (S.temps?.hot) { const w = { role: 'assistant', content: '', live: true, status: T('cooling') }; S.msgs.push(w); const wi = S.msgs.length - 1; addMsg(wi); await cool(signal); S.msgs.splice(wi, 1); root.querySelector(`.msg[data-i="${wi}"]`)?.remove(); }
     if (round === 0 && ag.id === 'files') { let l = []; try { l = await P.ws.list('.'); } catch (e) {} S.msgs.push({ role: 'tool', content: `Workspace files (${l.length}):\n${l.join('\n') || '(empty)'}` }); addMsg(S.msgs.length - 1); }
@@ -1157,6 +1178,7 @@ async function runAgent(ag, userText, signal) {
     try {
       const meta = {};
       await stream([sysMsg(ag.prompt, ag.tools, ag.id === 'chat'), ...(ag.tools ? fewshot() : []), ...history], signal, c => { msg.content += c; paint(idx); }, null, meta);
+      if (meta.finish === 'loop') msg.content = msg.content.slice(0, msg.content.length - (meta.loopCut || 0));
       for (let k = 0; k < 4 && meta.finish === 'length'; k++) {
         msg.status = T('stContinue'); meta.finish = null;
         await stream([{ role: 'system', content: ag.prompt + ' Continue the answer exactly where it stopped. Do not repeat anything.' }, { role: 'user', content: userText },
@@ -1166,6 +1188,10 @@ async function runAgent(ag, userText, signal) {
     if (!ag.tools) return;
     const acts = parseActions(noThink(msg.content));
     if (!acts.length) { if (SAVE_RE.test(userText)) await applyAuto(msg, idx, userText, ag.id); return; }
+    const sig = acts.map(a => a.kind + ':' + a.arg).join('\n');
+    acts.forEach(a => { const k = a.kind + ':' + a.arg; seen[k] = (seen[k] || 0) + 1; });
+    if (sig === lastSig || acts.some(a => seen[a.kind + ':' + a.arg] > 2)) { msg.actions = null; msg.content = noThink(msg.content).replace(/```[\s\S]*?```/g, '').trim(); msg.extra = [...(msg.extra || [])]; msg.loopNote = true; msg.content += (msg.content ? '\n\n' : '') + T('loopStop'); paint(idx); return; }
+    lastSig = sig;
     msg.actions = acts; paint(idx);
     const files = acts.filter(a => /^(file|mkdir|move)$/.test(a.kind));
     const allowed = files.length ? await askSave(msg, idx, files.map(a => a.kind === 'move' ? a.arg.replace('|', ' → ') : a.kind === 'mkdir' ? a.arg.replace(/\/?$/, '/') : a.arg)) : true;
@@ -1351,6 +1377,7 @@ async function runChain(text, signal, plan) {
     const user = pg.code ? `Change request: ${text}\n\nCurrent code of ${pg.file} (keep everything that was not asked to change, return the whole updated file):\n\`\`\`${plan.site ? 'html' : ''}\n${pg.code.slice(0, 24000)}\n\`\`\`` : `Request: ${text}${pages.length > 1 ? `\n\nThis page: ${pg.file} — ${pg.title}. Content: ${pg.purpose}` : ''}${brief ? `\n\nDesign reference from the examples (recreate this style and structure with the user's own content):\n${brief.slice(0, 5000)}` : ''}`;
     const meta = {};
     await stream([{ role: 'system', content: sys }, { role: 'user', content: user }], signal, c => { p.content += c; paint(idx); }, { temperature: 0.3 }, meta);
+    if (meta.finish === 'loop') p.content = p.content.slice(0, p.content.length - (meta.loopCut || 0));
     for (let r = 0; r < 4 && meta.finish === 'length'; r++) {
       meta.finish = null;
       await stream([{ role: 'system', content: sys + ' Continue exactly where it stopped, no repetition.' }, { role: 'user', content: user }, { role: 'assistant', content: p.content.slice(-6000) }], signal, c => { p.content += c; paint(idx); }, null, meta);

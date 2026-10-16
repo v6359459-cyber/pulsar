@@ -395,7 +395,7 @@ app.on('web-contents-created', (_e, wc) => {
 });
 ipcMain.handle('open:external', (_e, url) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); return true; });
 
-// ---------- heat guard: watch GPU/CPU temperature, step back above 80 °C ----------
+// ---------- heat guard: watch GPU/CPU temperature, slow down above the user's limits (75 °C by default) ----------
 let tempTimer = null, hot = false;
 function nvidiaTemp() {
   return new Promise(res => execFile('nvidia-smi', ['--query-gpu=temperature.gpu', '--format=csv,noheader,nounits'], { windowsHide: true, timeout: 4000 },
@@ -411,9 +411,10 @@ function startTemps() {
   clearInterval(tempTimer);
   tempTimer = setInterval(async () => {
     const s = readSettings(); if (s.heat === false) { if (hot) { hot = false; send('temps', { hot: false }); } return; }
-    const limit = s.heatLimit || 80;
-    const t = await readTemps(); const max = Math.max(t.gpu || 0, t.cpu || 0);
-    const nowHot = max >= limit ? true : max < limit - 6 ? false : hot;
+    const gl = s.gpuLimit || 75, cl = s.cpuLimit || 75;
+    const t = await readTemps(); const max = Math.max(t.gpu || 0, t.cpu || 0), limit = Math.min(gl, cl);
+    const over = (t.gpu || 0) >= gl || (t.cpu || 0) >= cl, cool = (t.gpu || 0) < gl - 6 && (t.cpu || 0) < cl - 6;
+    const nowHot = over ? true : cool ? false : hot;
     if (nowHot !== hot) { hot = nowHot; if (server && server.pid) { try { require('os').setPriority(server.pid, hot ? 19 : 0); } catch {} } }
     send('temps', { ...t, max, hot, limit });
   }, 5000);
