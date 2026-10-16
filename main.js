@@ -179,6 +179,7 @@ async function launch(kind, opts) {
   if (opts.slots > 1) { args.push('-np', String(opts.slots)); args[args.indexOf('-c') + 1] = String((opts.ctx || 4096) * opts.slots); }
   if (opts.cpuMoe && kind === 'vulkan') args.push('--cpu-moe');
   if (opts.kv !== false) args.push('-fa', 'on', '-ctk', 'q8_0', '-ctv', 'q8_0');
+  if (opts.draft) { const dp = path.join(DIRS().models, opts.draft + '.gguf'); if (fs.existsSync(dp)) args.push('-md', dp, '-ngld', kind === 'vulkan' ? '99' : '0', '--draft-max', '16', '--draft-min', '1'); }
   send('engine:status', { stage: 'load', kind });
   let log = '';
   const logFile = path.join(DATA(), 'engine.log');
@@ -201,6 +202,8 @@ ipcMain.handle('engine:start', async (_e, opts) => {
   stopServer();
   const s = readSettings();
   const tries = [];
+  if (opts.draft && opts.gpu && s.engine !== 'cpu') tries.push(['vulkan', opts]);
+  opts = { ...opts, draft: null };
   if (opts.gpu && s.engine !== 'cpu') {
     tries.push(['vulkan', opts]);
     tries.push(['vulkan', { ...opts, kv: false, slots: 1, ctx: Math.min(opts.ctx || 4096, 4096) }]);
@@ -213,7 +216,7 @@ ipcMain.handle('engine:start', async (_e, opts) => {
       await launch(kind, o);
       serverInfo = { id: opts.id, kind, port: PORT, ngl: o.ngl, slots: o.slots || 1 };
       send('engine:status', { stage: 'ready', kind });
-      return { ok: true, kind, port: PORT, slots: o.slots || 1 };
+      return { ok: true, kind, port: PORT, slots: o.slots || 1, spec: !!o.draft };
     } catch (e) { lastErr = e; }
   }
   send('engine:status', { stage: 'error' });

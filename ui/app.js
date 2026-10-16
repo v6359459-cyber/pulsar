@@ -27,6 +27,28 @@ const CATALOG = [
   { id: 'qwen25-14b', cat: 'power', name: 'Qwen 2.5 14B', repos: ['bartowski/Qwen2.5-14B-Instruct-GGUF'], size: 9.0, layers: 48, kv: 98, tags: ['general', 'code'], ru: 'Умнее 7B-моделей. Лучше с видеокартой от 12 ГБ.', en: 'Smarter than 7B models. Best with a 12 GB GPU.' },
   { id: 'qwen25-32b', cat: 'power', name: 'Qwen 2.5 32B', repos: ['bartowski/Qwen2.5-32B-Instruct-GGUF'], size: 19.9, layers: 64, kv: 131, tags: ['general', 'code'], ru: 'Очень умная и очень тяжёлая.', en: 'Very smart and very heavy.' }
 ];
+// helper models: they cannot run alone, they only speed up a big model of the same family (speculative decoding)
+const DRAFTS = [
+  { id: 'draft-qwen25', name: 'Qwen 2.5 0.5B', repos: ['bartowski/Qwen2.5-0.5B-Instruct-GGUF'], quant: 'Q8_0', size: 0.5, layers: 24 },
+  { id: 'draft-qwen25-coder', name: 'Qwen 2.5 Coder 0.5B', repos: ['bartowski/Qwen2.5-Coder-0.5B-Instruct-GGUF'], quant: 'Q8_0', size: 0.5, layers: 24 },
+  { id: 'draft-llama32', name: 'Llama 3.2 1B', repos: ['bartowski/Llama-3.2-1B-Instruct-GGUF'], quant: 'Q8_0', size: 1.3, layers: 16 },
+  { id: 'draft-gemma2', name: 'Gemma 2 2B', repos: ['bartowski/gemma-2-2b-it-GGUF'], quant: 'Q4_K_M', size: 1.7, layers: 26 }
+];
+const DRAFT_FOR = { 'qwen25-14b': 'draft-qwen25', 'qwen25-32b': 'draft-qwen25', 'qwen25-coder-7b': 'draft-qwen25-coder', 'llama31-8b': 'draft-llama32', 'gemma2-9b': 'draft-gemma2' };
+const findM = id => allModels().find(x => x.id === id) || DRAFTS.find(x => x.id === id);
+function helperCard(d, i) {
+  const dl = S.dl[d.id], have = S.local.has(d.id), on = S.st.spec !== false;
+  const helps = Object.entries(DRAFT_FOR).filter(([, v]) => v === d.id).map(([k]) => CATALOG.find(m => m.id === k)?.name).filter(Boolean).join(', ');
+  let actions;
+  if (dl) actions = `<div class="track"><div id="pg-${d.id}" style="width:${dl.total ? (dl.got / dl.total * 100).toFixed(1) : 0}%"></div></div>
+    <div class="row small muted"><span class="mono" id="pt-${d.id}">${dlText(dl, d)}</span><button class="btn ghost sm" data-act="cancel" data-v="${d.id}">${T('cancel')}</button></div>`;
+  else if (have) actions = `<div class="row"><button class="btn sm ${on ? '' : 'ghost'}" style="flex:1" data-act="specTgl">${on ? T('helperOn') : T('helperOff')}</button><button class="btn ghost sm" data-act="del" data-v="${d.id}">${T('del')}</button></div>`;
+  else actions = `<button class="btn ghost sm" data-act="dlHelper" data-v="${d.id}">${S.partial[d.id] ? T('resumeDl') : T('download')}</button>`;
+  return `<div class="card fu helper" style="animation-delay:${.14 + i * .04}s">
+    <div class="row"><span class="fit fit2">${T('helperTag')}</span><span class="mono small muted">≈${d.size} ${T('gb')}</span></div>
+    <div style="font-size:21px;font-weight:400">${esc(d.name)}</div>
+    <div class="small muted" style="line-height:1.5;min-height:40px;font-size:14px">${T('helperD')} <span style="color:#bbb">${esc(helps)}</span></div>${actions}</div>`;
+}
 function allModels() {
   return [...CATALOG, ...(S.st.customModels || []).map(c => ({ id: c.id, cat: 'mine', name: c.name, path: c.path, size: c.sizeGB || 5, layers: 32, kv: 64, tags: ['general', 'code'], ru: 'Твоя модель с диска', en: 'Your model from disk' }))];
 }
@@ -230,7 +252,8 @@ function viewModels() {
     <div class="grid">${mine.map((m, k) => modelCard(m, plan(m), k).replace(/<button class="btn ghost sm" data-act="del" data-v="([^"]+)">/, '<button class="btn ghost sm" data-act="delCustom" data-v="$1">')).join('')}
     <button class="card fu addm" data-act="addModel"><span style="font-size:30px;font-weight:200">+</span><span>${T('addModel')}</span><span class="small muted">${T('addModelD')}</span></button></div>`;
   const banner = !S.local.size ? recCard(true) : '';
-  return `<h2 class="fu">${T('tModels')}</h2><p class="sub fu" style="animation-delay:.08s;margin-bottom:20px">${T('modelsSub')}</p>${banner}${chips}${cur === 'all' ? mineSec : ''}${sections}`;
+  const helpSec = `<div class="sec fu" style="animation-delay:.12s">${T('catHelp')} <span style="letter-spacing:0;text-transform:none;color:#555">— ${T('catHelpD')}</span></div><div class="grid">${DRAFTS.map(helperCard).join('')}</div>`;
+  return `<h2 class="fu">${T('tModels')}</h2><p class="sub fu" style="animation-delay:.08s;margin-bottom:20px">${T('modelsSub')}</p>${banner}${chips}${cur === 'all' ? mineSec : ''}${sections}${cur === 'all' ? helpSec : ''}`;
 }
 function kimiCard() {
   const k = (S.st.apis || []).find(a => a.cloud === 'kimi');
@@ -258,8 +281,8 @@ function recCard(compact) {
       : `<div class="row" style="justify-content:flex-start;gap:10px"><button class="btn sm" data-act="recDl" data-v="${m.id}">${T('recBtn')}</button>${compact ? '' : `<button class="btn ghost sm" data-act="toApp">${T('later')}</button>`}</div>`}</div>`;
 }
 async function downloadModel(id) {
-  const m = allModels().find(x => x.id === id); const p = plan(m);
-  if (p.fit <= 0 && !confirm(T('warnHeavy'))) return;
+  const m = findM(id); const helper = id.startsWith('draft-');
+  if (!helper && plan(m).fit <= 0 && !confirm(T('warnHeavy'))) return;
   S.dl[id] = { got: 0, total: m.size * 1073741824 }; Sound.tick(1400); renderMain();
   const r = await P.download({ id, repos: m.repos, quant: m.quant || 'Q4_K_M' });
   delete S.dl[id]; S.partial = await P.partials();
@@ -272,16 +295,17 @@ P.onProgress(({ id, got, total }) => {
   if (S.tab !== 'models') return;
   const bar = document.getElementById('pg-' + id), txt = document.getElementById('pt-' + id);
   if (bar) bar.style.width = (S.dl[id].total ? S.dl[id].got / S.dl[id].total * 100 : 0).toFixed(1) + '%';
-  if (txt) txt.textContent = dlText(S.dl[id], allModels().find(x => x.id === id));
+  if (txt) txt.textContent = dlText(S.dl[id], findM(id));
 });
 async function runModel(id) { S.tab = 'chat'; renderNav(); renderMain(); return startModel(id); }
 async function startModel(id) {
   const m = allModels().find(x => x.id === id); const p = plan(m);
   S.running = null; S.engine = { stage: 'load' };
   if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = engineText(); }
-  const r = await P.start({ id, path: m.path, ngl: p.ngl, ctx: p.ctx, threads: p.threads, gpu: p.ngl > 0, layers: m.layers, slots: p.slots, cpuMoe: p.cpuMoe });
+  const dr = DRAFT_FOR[id], useDraft = dr && S.st.spec !== false && S.local.has(dr) && p.ngl >= (m.layers || 32) && !p.cpuMoe;
+  const r = await P.start({ id, path: m.path, ngl: p.ngl, ctx: p.ctx, threads: p.threads, gpu: p.ngl > 0, layers: m.layers, slots: p.slots, cpuMoe: p.cpuMoe, draft: useDraft ? dr : null });
   if (!r.ok) { S.engine = { stage: 'error', error: r.error }; toast(T('eError') + ': ' + (r.error || '').slice(0, 300)); if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = engineText(); } return false; }
-  S.running = id; S.slots = r.slots || 1; S.engine = { stage: 'ready', kind: r.kind }; if (!S.sel || S.sel === 'local') S.sel = 'local';
+  S.running = id; S.slots = r.slots || 1; S.engine = { stage: 'ready', kind: r.kind }; S.spec = !!r.spec; if (r.spec) toast(T('specOn')); if (!S.sel || S.sel === 'local') S.sel = 'local';
   renderNav(); if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = ''; const mp = $('#mpill'); if (mp) mp.textContent = m.name; } else renderMain();
   Sound.done();
   if (!(S.st.speed && S.st.speed[id])) measureSpeed(id);
@@ -334,6 +358,8 @@ function viewOpt() {
     ['sound', T('oSound'), T('oSoundD'), S.st.sound !== false ? T('on') : T('off')],
     ['theme', T('oTheme'), T('oThemeD'), S.st.theme === 'light' ? T('light') : T('dark')],
     ['tray', T('oTray'), T('oTrayD'), S.st.tray !== false ? T('on') : T('off')],
+    ['memory', T('oMemory'), T('oMemoryD'), (S.st.memory || []).length ? `${(S.st.memory || []).length} · ${T('clear')}` : '—'],
+    ['spec', T('oSpec'), T('oSpecD'), S.st.spec !== false ? T('on') : T('off')],
     ['trusted', T('oTrusted'), T('oTrustedD'), (S.st.trustedHosts || []).length ? `${(S.st.trustedHosts || []).length} · ${T('clear')}` : '—'],
     ['lang', T('oLang'), '', L() === 'ru' ? 'Русский' : 'English']
   ];
@@ -356,6 +382,8 @@ async function toggleOpt(k) {
   if (k === 'theme') { await save({ theme: S.st.theme === 'light' ? 'dark' : 'light' }); applyTheme(); }
   if (k === 'tray') await save({ tray: S.st.tray === false });
   if (k === 'trusted') await save({ trustedHosts: [] });
+  if (k === 'memory') await save({ memory: [] });
+  if (k === 'spec') await save({ spec: S.st.spec === false });
   if (k === 'heat') { const seq = [[true, 80], [true, 75], [true, 85], [false, 80]]; const i = seq.findIndex(x => x[0] === (S.st.heat !== false) && x[1] === (S.st.heatLimit || 80)); const n = seq[(i + 1) % seq.length]; await save({ heat: n[0], heatLimit: n[1] }); }
   if (k === 'lang') { await save({ lang: L() === 'ru' ? 'en' : 'ru' }); renderNav(); }
   await save({ opt: o }); Sound.tick(1500); renderMain();
@@ -423,6 +451,7 @@ function sources() {
 }
 const ICON = {
   bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
   folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -545,7 +574,7 @@ function msgInner(m) {
   if (m.chain) return chainHTML(m) + (m.content ? `<div style="margin-top:14px">${md(m.content)}</div>` : '') + (m.extra || []).map(a => actLine(a.kind, a.arg, a)).join('') + askHTML(m.ask);
   const extra = (m.extra || []).map(a => actLine(a.kind, a.arg, a)).join('');
   const ctx = { acts: m.actions, k: 0, only: m.parts ? ['file', 'run'] : null };
-  if (!m.parts) return (m.agent ? `<div class="alabel">${esc(m.agent)}</div>` : '') + (m.content ? md(m.content, ctx) : '') + extra + askHTML(m.ask) + (m.live ? statusHTML(m.status || liveStatus(m.content)) : '');
+  if (!m.parts) return (m.agent ? `<div class="alabel">${esc(m.agent)}</div>` : '') + (m.content ? md(stripMem(m.content), ctx) : '') + (m.memNote ? `<div class="memnote">${ico('check', 12)}<span>${esc(m.memNote)}</span></div>` : '') + extra + askHTML(m.ask) + (m.live ? statusHTML(m.status || liveStatus(m.content)) : '');
   const st = { wait: T('waiting'), work: T('working'), done: T('done') };
   const head = m.stage === 'plan' ? statusHTML(T('planning')) : '';
   const steps = m.parts.map(p => `<div class="step"><div class="row"><span style="font-size:15px;font-weight:400">${p.status === 'work' ? '<span class="dot led" style="display:inline-block;margin-right:8px"></span>' : ''}${esc(p.name)}</span>
@@ -928,7 +957,22 @@ const FEWSHOT = {
   en: [['user', 'Save hello.txt with the text Hi'], ['assistant', '```file:hello.txt\nHi\n```'], ['user', '[Action results]\nFile saved: hello.txt'], ['assistant', 'Done — saved hello.txt in the workspace.'],
     ['user', 'Open example.com'], ['assistant', '```open:https://example.com\n```'], ['user', '[Action results]\nPage https://example.com:\nExample Domain\nThis domain is for use in examples.'], ['assistant', 'Opened example.com in the built-in browser. It is the demo page "Example Domain".']]
 };
-const sysMsg = (prompt, tools) => ({ role: 'system', content: prompt + (tools ? '\n' + TOOLS_PROMPT : '') + `\nWorkspace folder: ${S.ws || ''}` });
+const memText = () => (S.st.memory || []).length ? `\nWhat you know about the user from earlier chats (use it naturally, do not list it):\n${S.st.memory.map(x => '- ' + x).join('\n')}` : '';
+const MEM_RULE = '\nIf the user tells you something lasting about themselves (name, city, work, projects, what they like or want from you), put at the very end of your reply one line per fact: [[remember: short fact]]. If they ask to forget something: [[forget: the fact]]. Never mention these lines.';
+const sysMsg = (prompt, tools, mem) => ({ role: 'system', content: prompt + (tools ? '\n' + TOOLS_PROMPT : '') + (mem ? MEM_RULE : '') + memText() + `\nWorkspace folder: ${S.ws || ''}` });
+const MEM_RE = /\[\[\s*(remember|forget|запомни|забудь)\s*:\s*([^\]]+?)\s*\]\]/gi;
+const stripMem = s => (s || '').replace(MEM_RE, '').replace(/\[\[[^\]]*\]?$/, '').trimEnd();
+async function applyMemory(msg) {
+  const add = [], del = [];
+  for (const [, k, v] of (msg.content || '').matchAll(MEM_RE)) (/^(forget|забудь)/i.test(k) ? del : add).push(v.trim());
+  if (!add.length && !del.length) return;
+  msg.content = stripMem(msg.content);
+  const lo = x => x.toLowerCase();
+  let mem = (S.st.memory || []).filter(x => !del.some(d => lo(x).includes(lo(d)) || lo(d).includes(lo(x))));
+  for (const a of add) if (!mem.some(x => lo(x) === lo(a))) mem.push(a.slice(0, 200));
+  await save({ memory: mem.slice(-40) });
+  msg.memNote = add.length ? T('memSaved') + ' ' + add.join(' · ') : T('memForgot');
+}
 const fewshot = () => FEWSHOT[L()].map(([role, content]) => ({ role, content }));
 function pickAgent(t) {
   const def = id => { const a = ourAgents().find(x => x[0] === id); return { id: a[0], name: a[1], prompt: a[3], tools: a[4] }; };
@@ -967,13 +1011,13 @@ async function runAgent(ag, userText, signal) {
     const msg = { role: 'assistant', content: '', live: true, agent: round === 0 ? ag.name : null }; S.msgs.push(msg); const idx = S.msgs.length - 1; addMsg(idx);
     try {
       const meta = {};
-      await stream([sysMsg(ag.prompt, ag.tools), ...(ag.tools ? fewshot() : []), ...history], signal, c => { msg.content += c; paint(idx); }, null, meta);
+      await stream([sysMsg(ag.prompt, ag.tools, ag.id === 'chat'), ...(ag.tools ? fewshot() : []), ...history], signal, c => { msg.content += c; paint(idx); }, null, meta);
       for (let k = 0; k < 4 && meta.finish === 'length'; k++) {
         msg.status = T('stContinue'); meta.finish = null;
         await stream([{ role: 'system', content: ag.prompt + ' Continue the answer exactly where it stopped. Do not repeat anything.' }, { role: 'user', content: userText },
           { role: 'assistant', content: msg.content.slice(-6000) }], signal, c => { msg.content += c; paint(idx); }, null, meta);
       }
-    } finally { msg.live = false; msg.status = null; paint(idx); }
+    } finally { msg.live = false; msg.status = null; await applyMemory(msg).catch(() => {}); paint(idx); }
     if (!ag.tools) return;
     const acts = parseActions(noThink(msg.content));
     if (!acts.length) { if (SAVE_RE.test(userText)) await applyAuto(msg, idx, userText, ag.id); return; }
@@ -1365,6 +1409,8 @@ root.addEventListener('click', async e => {
     case 'cext': if (S.editFile) P.ws.openFile(S.editFile); break;
     case 'attach': { const f = await P.pickFiles(); addAttach(f); break; }
     case 'unattach': S.attach.splice(+v, 1); drawAttach(); break;
+    case 'dlHelper': downloadModel(v); break;
+    case 'specTgl': await save({ spec: S.st.spec === false }); Sound.tick(1500); renderMain(); if (S.running && DRAFT_FOR[S.running]) toast(T('specRestart')); break;
     case 'allowSite': { const h = b.dataset.h; if (h) await save({ trustedHosts: [...new Set([...(S.st.trustedHosts || []), h])] }); const r = S.pending[v]; delete S.pending[v]; r && r(true); Sound.tick(1500); break; }
     case 'allowAll': { S.allowAll = true; const r = S.pending[v]; delete S.pending[v]; r && r(true); break; }
     case 'addModel': { const m = await P.pickModel(); if (m) { const id = 'custom-' + (slug(m.name) || Date.now()); await save({ customModels: [...(S.st.customModels || []).filter(x => x.id !== id), { id, name: m.name, path: m.path, sizeGB: m.sizeGB }] }); S.local.add(id); Sound.done(); renderMain(); } break; }
