@@ -176,10 +176,10 @@ Object.assign(I18N.ru, { permSiteT: 'Открыть сайт', permSiteD: 'Аг�
   alwaysFor: h => `Всегда для ${h.replace(/^www\./, '')}`, oTrusted: 'Доверенные сайты', oTrustedD: 'Сайты, которые агенты открывают без вопроса', clear: 'очистить' });
 Object.assign(I18N.en, { permSiteT: 'Open website', permSiteD: 'The agent will open the page in the built-in browser and read it.', permSaveT: n => n === 1 ? 'Save the file to your computer' : `Save ${n} files to your computer`, permSaveD: 'Files will appear in Documents\\PULSAR.',
   alwaysFor: h => `Always for ${h.replace(/^www\./, '')}`, oTrusted: 'Trusted sites', oTrustedD: 'Sites the agents open without asking', clear: 'clear' });
-Object.assign(I18N.ru, { catHelp: 'Ускорители', catHelpD: 'не запускаются сами, только помогают большой модели отвечать быстрее', helperTag: 'Помощник', helperD: 'Ускоряет в 1,5–2 раза:', helperOn: 'Помогает · вкл', helperOff: 'Выключен',
+Object.assign(I18N.ru, { draftAuto: 'Качаю ускоритель {d} для {m} — подключу сам', catHelp: 'Ускорители', catHelpD: 'помогают большой модели отвечать быстрее; PULSAR сам видит модель и качает нужный при запуске', helperTag: 'Помощник', helperD: 'Ускоряет в 1,5–2 раза:', helperOn: 'Помогает · вкл', helperOff: 'Выключен',
   specOn: 'Ускоритель включён — ответы быстрее', specRestart: 'Перезапусти модель, чтобы применить', oSpec: 'Ускорители', oSpecD: 'Маленькая модель подсказывает большой — ответы быстрее',
   oMemory: 'Память HELLO PULSAR', oMemoryD: 'Что агент запомнил о тебе между чатами', memSaved: 'Запомнил:', memForgot: 'Забыл' });
-Object.assign(I18N.en, { catHelp: 'Boosters', catHelpD: 'they do not run alone, they help a big model answer faster', helperTag: 'Helper', helperD: 'Speeds up 1.5–2×:', helperOn: 'Helping · on', helperOff: 'Off',
+Object.assign(I18N.en, { draftAuto: 'Downloading booster {d} for {m} — will plug it in automatically', catHelp: 'Boosters', catHelpD: 'they help a big model answer faster; PULSAR detects the model and downloads the right one on launch', helperTag: 'Helper', helperD: 'Speeds up 1.5–2×:', helperOn: 'Helping · on', helperOff: 'Off',
   specOn: 'Booster on — faster answers', specRestart: 'Restart the model to apply', oSpec: 'Boosters', oSpecD: 'A small model drafts for the big one — faster answers',
   oMemory: 'HELLO PULSAR memory', oMemoryD: 'What the agent remembers about you between chats', memSaved: 'Remembered:', memForgot: 'Forgot' });
 

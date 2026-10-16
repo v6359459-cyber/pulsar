@@ -29,16 +29,40 @@ const CATALOG = [
 ];
 // helper models: they cannot run alone, they only speed up a big model of the same family (speculative decoding)
 const DRAFTS = [
+  { id: 'draft-qwen35', name: 'Qwen3.5 0.8B', repos: ['unsloth/Qwen3.5-0.8B-GGUF', 'bartowski/Qwen_Qwen3.5-0.8B-GGUF', 'lmstudio-community/Qwen3.5-0.8B-GGUF'], quant: 'Q8_0', size: 0.8, layers: 24 },
+  { id: 'draft-qwen3', name: 'Qwen3 0.6B', repos: ['bartowski/Qwen_Qwen3-0.6B-GGUF', 'unsloth/Qwen3-0.6B-GGUF'], quant: 'Q8_0', size: 0.6, layers: 28 },
+  { id: 'draft-r1', name: 'DeepSeek R1 Distill 1.5B', repos: ['bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF', 'unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF'], quant: 'Q4_K_M', size: 1.1, layers: 28 },
   { id: 'draft-qwen25', name: 'Qwen 2.5 0.5B', repos: ['bartowski/Qwen2.5-0.5B-Instruct-GGUF'], quant: 'Q8_0', size: 0.5, layers: 24 },
   { id: 'draft-qwen25-coder', name: 'Qwen 2.5 Coder 0.5B', repos: ['bartowski/Qwen2.5-Coder-0.5B-Instruct-GGUF'], quant: 'Q8_0', size: 0.5, layers: 24 },
   { id: 'draft-llama32', name: 'Llama 3.2 1B', repos: ['bartowski/Llama-3.2-1B-Instruct-GGUF'], quant: 'Q8_0', size: 1.3, layers: 16 },
-  { id: 'draft-gemma2', name: 'Gemma 2 2B', repos: ['bartowski/gemma-2-2b-it-GGUF'], quant: 'Q4_K_M', size: 1.7, layers: 26 }
+  { id: 'draft-gemma4', name: 'Gemma 4 E2B', repos: ['unsloth/gemma-4-E2B-it-GGUF', 'ggml-org/gemma-4-E2B-it-GGUF'], quant: 'Q4_K_M', size: 3.1, layers: 35 },
+  { id: 'draft-gemma2', name: 'Gemma 2 2B', repos: ['bartowski/gemma-2-2b-it-GGUF'], quant: 'Q4_K_M', size: 1.7, layers: 26 },
+  { id: 'draft-granite', name: 'Granite 4.2 3B', repos: ['bartowski/granite-4.2-3b-GGUF'], quant: 'Q4_K_M', size: 2.0, layers: 40 }
 ];
-const DRAFT_FOR = { 'qwen25-14b': 'draft-qwen25', 'qwen25-32b': 'draft-qwen25', 'qwen25-coder-7b': 'draft-qwen25-coder', 'llama31-8b': 'draft-llama32', 'gemma2-9b': 'draft-gemma2' };
+// accelerator is chosen by model name, so it also works for the user's own models from disk
+const DRAFT_RULES = [
+  [/qwen[\s_.-]*3\.5/i, 'draft-qwen35'],
+  [/r1[\s_.-]*0528|qwen[\s_.-]*3(?![.\d])/i, 'draft-qwen3'],
+  [/r1[\s_.-]*distill|deepseek.*distill.*qwen/i, 'draft-r1'],
+  [/qwen[\s_.-]*2\.5.*coder/i, 'draft-qwen25-coder'],
+  [/qwen[\s_.-]*2\.5/i, 'draft-qwen25'],
+  [/llama[\s_.-]*3(\.[123])?/i, 'draft-llama32'],
+  [/gemma[\s_.-]*4/i, 'draft-gemma4'],
+  [/gemma[\s_.-]*2/i, 'draft-gemma2'],
+  [/granite[\s_.-]*4/i, 'draft-granite']
+];
+const NO_DRAFT = new Set(['gemma4-e4b', 'lfm25-8b-a1b', 'gpt-oss-20b', 'phi35-mini']);
+function draftFor(m) {
+  if (!m || NO_DRAFT.has(m.id) || String(m.id).startsWith('draft-')) return null;
+  const key = `${m.id} ${m.name} ${m.path ? m.path.split(/[\\/]/).pop() : ''}`;
+  const r = DRAFT_RULES.find(([re]) => re.test(key)); if (!r) return null;
+  const d = DRAFTS.find(x => x.id === r[1]);
+  return d && (m.size || 5) >= d.size * 2 ? d.id : null;
+}
 const findM = id => allModels().find(x => x.id === id) || DRAFTS.find(x => x.id === id);
 function helperCard(d, i) {
   const dl = S.dl[d.id], have = S.local.has(d.id), on = S.st.spec !== false;
-  const helps = Object.entries(DRAFT_FOR).filter(([, v]) => v === d.id).map(([k]) => CATALOG.find(m => m.id === k)?.name).filter(Boolean).join(', ');
+  const helps = allModels().filter(m => draftFor(m) === d.id).map(m => m.name).join(', ');
   let actions;
   if (dl) actions = `<div class="track"><div id="pg-${d.id}" style="width:${dl.total ? (dl.got / dl.total * 100).toFixed(1) : 0}%"></div></div>
     <div class="row small muted"><span class="mono" id="pt-${d.id}">${dlText(dl, d)}</span><button class="btn ghost sm" data-act="cancel" data-v="${d.id}">${T('cancel')}</button></div>`;
@@ -298,12 +322,19 @@ P.onProgress(({ id, got, total }) => {
   if (bar) bar.style.width = (S.dl[id].total ? S.dl[id].got / S.dl[id].total * 100 : 0).toFixed(1) + '%';
   if (txt) txt.textContent = dlText(S.dl[id], findM(id));
 });
+// sees the model name and downloads the matching accelerator by itself; restarts the model with it when idle
+async function autoDraft(id, dr) {
+  toast(T('draftAuto').replace('{d}', findM(dr).name).replace('{m}', findM(id).name));
+  await downloadModel(dr);
+  if (S.local.has(dr) && S.running === id && !S.streaming && !S.busy) startModel(id);
+}
 async function runModel(id) { S.tab = 'chat'; renderNav(); renderMain(); return startModel(id); }
 async function startModel(id) {
   const m = allModels().find(x => x.id === id); const p = plan(m);
   S.running = null; S.engine = { stage: 'load' };
   if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = engineText(); }
-  const dr = DRAFT_FOR[id], useDraft = dr && S.st.spec !== false && S.local.has(dr) && p.ngl >= (m.layers || 32) && !p.cpuMoe;
+  const dr = draftFor(m), canDraft = dr && S.st.spec !== false && p.ngl >= (m.layers || 32) && !p.cpuMoe, useDraft = canDraft && S.local.has(dr);
+  if (canDraft && !S.local.has(dr) && !S.dl[dr]) autoDraft(id, dr);
   const r = await P.start({ id, path: m.path, ngl: p.ngl, ctx: p.ctx, threads: p.threads, gpu: p.ngl > 0, layers: m.layers, slots: p.slots, cpuMoe: p.cpuMoe, draft: useDraft ? dr : null });
   if (!r.ok) { S.engine = { stage: 'error', error: r.error }; toast(T('eError') + ': ' + (r.error || '').slice(0, 300)); if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = engineText(); } return false; }
   S.running = id; S.slots = r.slots || 1; S.engine = { stage: 'ready', kind: r.kind }; S.spec = !!r.spec; if (r.spec) toast(T('specOn')); if (!S.sel || S.sel === 'local') S.sel = 'local';
@@ -1433,7 +1464,7 @@ root.addEventListener('click', async e => {
     case 'attach': { const f = await P.pickFiles(); addAttach(f); break; }
     case 'unattach': S.attach.splice(+v, 1); drawAttach(); break;
     case 'dlHelper': downloadModel(v); break;
-    case 'specTgl': await save({ spec: S.st.spec === false }); Sound.tick(1500); renderMain(); if (S.running && DRAFT_FOR[S.running]) toast(T('specRestart')); break;
+    case 'specTgl': await save({ spec: S.st.spec === false }); Sound.tick(1500); renderMain(); if (S.running && draftFor(findM(S.running))) toast(T('specRestart')); break;
     case 'allowSite': { const h = b.dataset.h; if (h) await save({ trustedHosts: [...new Set([...(S.st.trustedHosts || []), h])] }); const r = S.pending[v]; delete S.pending[v]; r && r(true); Sound.tick(1500); break; }
     case 'allowAll': { S.allowAll = true; const r = S.pending[v]; delete S.pending[v]; r && r(true); break; }
     case 'addModel': { const m = await P.pickModel(); if (m) { const id = 'custom-' + (slug(m.name) || Date.now()); await save({ customModels: [...(S.st.customModels || []).filter(x => x.id !== id), { id, name: m.name, path: m.path, sizeGB: m.sizeGB }] }); S.local.add(id); Sound.done(); renderMain(); } break; }
