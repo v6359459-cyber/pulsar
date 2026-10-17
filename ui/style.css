@@ -288,3 +288,11 @@ main.swap>*{animation:viewIn .5s cubic-bezier(.2,.8,.2,1) both}
 .dcard{cursor:pointer;gap:12px}.dcard.on{border-color:#fff}
 .dswatch{display:flex;gap:6px;align-items:center;height:64px;border-radius:14px;border:1px solid;padding:0 16px;transition:transform .5s cubic-bezier(.2,.9,.25,1)}.dcard:hover .dswatch{transform:scale(1.02)}
 .dswatch i{width:22px;height:22px;border-radius:11px;display:block;box-shadow:0 0 0 1px rgba(127,127,127,.25)}
+
+.visb{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#ddd;border:1px solid #2a2a2a;border-radius:10px;padding:3px 9px;align-self:flex-start}
+.pill.vis{gap:7px;color:#666}.pill.vis.on{color:#fff;border-color:#444}
+.micb{transition:color .3s,background .3s}.micb.rec{color:#ff5a5a;animation:led 1s ease-in-out infinite}.micb.busy{opacity:.5;animation:led 1.2s ease-in-out infinite}
+.ttsb{margin-top:10px;width:30px;height:30px;border-radius:15px;border:1px solid #222;background:none;color:#777;display:inline-grid;place-items:center;cursor:pointer;transition:color .2s,border-color .2s}.ttsb:hover{color:#fff;border-color:#555}
+.mimgs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}.mimgs img{max-width:220px;max-height:160px;border-radius:12px;object-fit:cover}
+.achip img{width:22px;height:22px;border-radius:6px;object-fit:cover;margin-right:4px}
+.askcard.choice{animation:permIn .5s cubic-bezier(.2,.8,.2,1)}

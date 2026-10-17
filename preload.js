@@ -19,6 +19,11 @@ contextBridge.exposeInMainWorld('pulsar', {
     console: r => ipcRenderer.invoke('ws:console', r), saveAs: (name, content) => ipcRenderer.invoke('ws:saveAs', { name, content })
   },
   chat: (id, url, key, body, kind) => ipcRenderer.send('chat:start', { id, url, key, body, kind }),
+  bootOk: () => ipcRenderer.send('boot:ok'),
+  mmproj: (id, repos) => ipcRenderer.invoke('model:mmproj', { id, repos }), hasMmproj: id => ipcRenderer.invoke('model:hasMmproj', id),
+  findPhotos: (q, n, key) => ipcRenderer.invoke('photos:find', { q, n, key }), wsDownload: (url, rel, alt) => ipcRenderer.invoke('ws:download', { url, rel, alt }),
+  voiceStatus: () => ipcRenderer.invoke('voice:status'), voiceSetup: () => ipcRenderer.invoke('voice:setup'), transcribe: (wav, lang) => ipcRenderer.invoke('voice:transcribe', { wav, lang }),
+  onVoiceProgress: on('voice:progress'),
   apiCheck: (key, url) => ipcRenderer.invoke('api:check', { key, url }), apiPing: a => ipcRenderer.invoke('api:ping', a),
   chatAbort: id => ipcRenderer.send('chat:abort', id),
   onChunk: on('chat:chunk'),

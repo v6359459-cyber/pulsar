@@ -5,14 +5,14 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 
 const CATALOG = [
   // fast
-  { id: 'gemma4-e4b', cat: 'fast', fresh: true, name: 'Gemma 4 E4B', repos: ['unsloth/gemma-4-E4B-it-GGUF', 'mradermacher/gemma-4-E4B-it-GGUF'], size: 5.0, layers: 42, kv: 40, tags: ['general'], ru: 'Очень быстрая и современная. Хороша для повседневных вопросов.', en: 'Very fast and modern. Great for everyday questions.' },
+  { id: 'gemma4-e4b', vision: true, cat: 'fast', fresh: true, name: 'Gemma 4 E4B', repos: ['unsloth/gemma-4-E4B-it-GGUF', 'mradermacher/gemma-4-E4B-it-GGUF'], size: 5.0, layers: 42, kv: 40, tags: ['general'], ru: 'Очень быстрая и современная. Хороша для повседневных вопросов.', en: 'Very fast and modern. Great for everyday questions.' },
   { id: 'lfm25-8b-a1b', cat: 'fast', fresh: true, name: 'LFM2.5 8B-A1B', repos: ['LiquidAI/LFM2.5-8B-A1B-GGUF', 'AtomicChat/lfm25-8b-a1b-GGUF', 'atomicchat/lfm25-8b-a1b-GGUF'], size: 5.2, layers: 24, kv: 10, tags: ['general'], ru: 'Работает только 1,5 млрд параметров из 8 — поэтому отвечает мгновенно.', en: 'Only 1.5B of 8B parameters are active — answers instantly.' },
   { id: 'llama32-3b', cat: 'fast', fresh: true, name: 'Llama 3.2 3B', repos: ['bartowski/Llama-3.2-3B-Instruct-GGUF'], size: 2.0, layers: 28, kv: 57, tags: ['general'], ru: 'Самая лёгкая и быстрая. Пойдёт даже на слабом ПК.', en: 'Lightest and fastest. Runs even on a weak PC.' },
   { id: 'qwen25-3b', cat: 'fast', name: 'Qwen 2.5 3B', repos: ['bartowski/Qwen2.5-3B-Instruct-GGUF'], size: 1.9, layers: 36, kv: 18, tags: ['general'], ru: 'Маленькая и быстрая. Для слабых ПК.', en: 'Small and fast. For weak PCs.' },
   { id: 'llama31-8b', cat: 'fast', name: 'Llama 3.1 8B', repos: ['bartowski/Meta-Llama-3.1-8B-Instruct-GGUF'], size: 4.9, layers: 32, kv: 65, tags: ['general'], ru: 'Универсальная. Общение, тексты, вопросы.', en: 'All-rounder. Chat, writing, questions.' },
   { id: 'gemma2-9b', cat: 'fast', name: 'Gemma 2 9B', repos: ['bartowski/gemma-2-9b-it-GGUF'], size: 5.8, layers: 42, kv: 172, maxCtx: 8192, tags: ['general'], ru: 'Аккуратные ответы, хорошо держит русский. Для длинных сайтов мало памяти.', en: 'Neat answers, strong multilingual. Short memory for long sites.' },
   // code
-  { id: 'qwen35-9b', cat: 'code', fresh: true, name: 'Qwen3.5 9B', repos: ['bartowski/Qwen_Qwen3.5-9B-GGUF', 'unsloth/Qwen3.5-9B-GGUF'], size: 5.9, layers: 32, kv: 16, tags: ['code', 'general'], ru: 'Лучшая для кода и сайтов на 8 ГБ в 2026 году. Хорошо знает русский.', en: 'Best for code and websites on 8 GB in 2026. Strong multilingual.' },
+  { id: 'qwen35-9b', vision: true, cat: 'code', fresh: true, name: 'Qwen3.5 9B', repos: ['bartowski/Qwen_Qwen3.5-9B-GGUF', 'unsloth/Qwen3.5-9B-GGUF'], size: 5.9, layers: 32, kv: 16, tags: ['code', 'general'], ru: 'Лучшая для кода и сайтов на 8 ГБ в 2026 году. Хорошо знает русский.', en: 'Best for code and websites on 8 GB in 2026. Strong multilingual.' },
   { id: 'granite42-8b', cat: 'code', fresh: true, name: 'Granite 4.2 8B', repos: ['bartowski/granite-4.2-8b-GGUF'], size: 5.5, layers: 40, kv: 10, tags: ['code'], ru: 'Точно выполняет команды и действия. Хороша для агентов и файлов.', en: 'Follows commands and actions precisely. Great for agents and files.' },
   { id: 'qwen25-coder-7b', cat: 'code', name: 'Qwen 2.5 Coder 7B', repos: ['bartowski/Qwen2.5-Coder-7B-Instruct-GGUF'], size: 4.7, layers: 28, kv: 29, tags: ['code'], ru: 'Проверенная модель для кода. Стабильная и быстрая.', en: 'Proven code model. Stable and fast.' },
   { id: 'qwen25-coder-3b', cat: 'code', name: 'Qwen 2.5 Coder 3B', repos: ['bartowski/Qwen2.5-Coder-3B-Instruct-GGUF'], size: 1.9, layers: 36, kv: 18, tags: ['code'], ru: 'Маленькая модель для кода. Быстрая даже на слабом ПК.', en: 'Small code model. Fast even on weak PCs.' },
@@ -22,8 +22,8 @@ const CATALOG = [
   { id: 'phi35-mini', cat: 'logic', name: 'Phi-3.5 mini', repos: ['bartowski/Phi-3.5-mini-instruct-GGUF'], size: 2.4, layers: 32, kv: 196, tags: ['reason'], ru: 'Лёгкая, хорошо рассуждает для своего размера.', en: 'Light, reasons well for its size.' },
   // power
   { id: 'gpt-oss-20b', cat: 'power', fresh: true, name: 'gpt-oss 20B', repos: ['ggml-org/gpt-oss-20b-GGUF'], quant: 'MXFP4', size: 12.1, layers: 24, kv: 24, moe: true, active: 3.6, tags: ['general', 'code', 'reason'], ru: 'Самая умная из тех, что потянет обычный ПК. Модель от OpenAI.', en: 'Smartest model a normal PC can run. By OpenAI.' },
-  { id: 'gemma4-12b', cat: 'power', fresh: true, name: 'Gemma 4 12B', repos: ['unsloth/gemma-4-12b-it-GGUF'], size: 7.6, layers: 48, kv: 100, tags: ['code', 'general'], ru: 'Заметно сильнее в коде, чем лёгкие модели. Медленнее.', en: 'Noticeably stronger at code than light models. Slower.' },
-  { id: 'gemma4-26b-a4b', cat: 'power', fresh: true, name: 'Gemma 4 26B A4B', repos: ['unsloth/gemma-4-26B-A4B-it-GGUF', 'AtomicChat/gemma-4-26B-A4B-it-GGUF'], size: 15.5, layers: 30, kv: 100, moe: true, active: 4, tags: ['code', 'general'], ru: 'Лучшая по коду в списке. Нужно много оперативной памяти.', en: 'Best at code in the list. Needs a lot of RAM.' },
+  { id: 'gemma4-12b', vision: true, cat: 'power', fresh: true, name: 'Gemma 4 12B', repos: ['unsloth/gemma-4-12b-it-GGUF'], size: 7.6, layers: 48, kv: 100, tags: ['code', 'general'], ru: 'Заметно сильнее в коде, чем лёгкие модели. Медленнее.', en: 'Noticeably stronger at code than light models. Slower.' },
+  { id: 'gemma4-26b-a4b', vision: true, cat: 'power', fresh: true, name: 'Gemma 4 26B A4B', repos: ['unsloth/gemma-4-26B-A4B-it-GGUF', 'AtomicChat/gemma-4-26B-A4B-it-GGUF'], size: 15.5, layers: 30, kv: 100, moe: true, active: 4, tags: ['code', 'general'], ru: 'Лучшая по коду в списке. Нужно много оперативной памяти.', en: 'Best at code in the list. Needs a lot of RAM.' },
   { id: 'qwen25-14b', cat: 'power', name: 'Qwen 2.5 14B', repos: ['bartowski/Qwen2.5-14B-Instruct-GGUF'], size: 9.0, layers: 48, kv: 98, tags: ['general', 'code'], ru: 'Умнее 7B-моделей. Лучше с видеокартой от 12 ГБ.', en: 'Smarter than 7B models. Best with a 12 GB GPU.' },
   { id: 'qwen25-32b', cat: 'power', name: 'Qwen 2.5 32B', repos: ['bartowski/Qwen2.5-32B-Instruct-GGUF'], size: 19.9, layers: 64, kv: 131, tags: ['general', 'code'], ru: 'Очень умная и очень тяжёлая.', en: 'Very smart and very heavy.' }
 ];
@@ -251,7 +251,7 @@ function renderMain() {
   m.style.padding = S.tab === 'chat' ? '48px 56px 28px' : '';
   if (S.tab === 'projects') { m.innerHTML = viewProjects(); loadProjects(); }
   else m.innerHTML = ({ chat: viewChat, models: viewModels, opt: viewOpt, agents: viewAgents, api: viewApi, design: viewDesign }[S.tab])();
-  if (S.tab === 'chat') { hookScroll(); const box = $('#msgs'); toBottom(box); $('#input')?.focus(); showBoost(); }
+  if (S.tab === 'chat') { hookScroll(); const box = $('#msgs'); toBottom(box); $('#input')?.focus(); showBoost(); showVision(); }
 }
 
 // ---------- models ----------
@@ -266,6 +266,7 @@ function modelCard(m, p, i) {
   return `<div class="card fu" style="animation-delay:${.1 + i * .04}s;${p.fit < 0 ? 'opacity:.55' : ''}">
     <div class="row"><span class="fit ${fk}">${T(fk)}</span><span class="mono small muted">${m.fresh ? '<span class="newb">' + T('fresh') + '</span>' : ''}≈${m.size} ${T('gb')}</span></div>
     <div style="font-size:21px;font-weight:400">${esc(m.name)}</div>
+    ${m.vision ? `<span class="visb">${ico('eye', 12)}${T('seesPics')}</span>` : ''}
     <div class="small muted" style="line-height:1.5;min-height:40px;font-size:14px">${esc(m[L()])}</div>
     <div class="mono" style="font-size:12px;color:#aaa;line-height:1.7;border-top:1px solid #1a1a1a;padding-top:12px">${planText(m, p)}</div>${actions}</div>`;
 }
@@ -338,17 +339,28 @@ async function autoDraft(id, dr) {
   while (S.running === id && S.streaming) await new Promise(r => setTimeout(r, 2000));
   if (S.running === id && !S.spec) { toast(T('bApply')); startModel(id); }
 }
+async function ensureVision() {
+  const id = S.running, m = id && findM(id); if (!m || !m.vision || S.visionOn) return true;
+  if (!(await P.hasMmproj(id))) {
+    toast(T('visDl')); S.dl[id + ':mmproj'] = { got: 0, total: 0 };
+    const r = await P.mmproj(id, m.repos || []); delete S.dl[id + ':mmproj'];
+    if (!r.ok) { toast(r.none ? T('visNone') : T('dlError') + ': ' + (r.error || '')); return false; }
+  }
+  toast(T('visOn')); return startModel(id, true);
+}
 async function runModel(id) { S.tab = 'chat'; renderNav(); renderMain(); return startModel(id); }
-async function startModel(id) {
+async function startModel(id, vision) {
+  if (vision === undefined) vision = S.visionOn && S.visionModel === id;
+  S.visionModel = vision ? id : null;
   const m = allModels().find(x => x.id === id); const p = plan(m);
   S.running = null; S.engine = { stage: 'load' };
   if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = engineText(); }
   const dd = draftOn(m), dr = dd && dd.id, canDraft = !!dr && p.draftRoom, useDraft = canDraft && S.local.has(dr);
   if (canDraft && !S.local.has(dr) && !S.dl[dr]) autoDraft(id, dr);
   S.runPlan = p;
-  const r = await P.start({ id, path: m.path, ngl: p.ngl, ctx: p.ctx, threads: p.threads, gpu: p.ngl > 0, layers: m.layers, slots: p.slots, cpuMoe: p.cpuMoe, draft: useDraft ? dr : null });
+  const r = await P.start({ id, mmproj: !!vision, path: m.path, ngl: p.ngl, ctx: p.ctx, threads: p.threads, gpu: p.ngl > 0, layers: m.layers, slots: p.slots, cpuMoe: p.cpuMoe, draft: useDraft && !vision ? dr : null });
   if (!r.ok) { S.engine = { stage: 'error', error: r.error }; toast(T('eError') + ': ' + (r.error || '').slice(0, 300)); if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = engineText(); } return false; }
-  S.running = id; S.slots = r.slots || 1; S.engine = { stage: 'ready', kind: r.kind }; S.spec = !!r.spec; S.specTried = useDraft; S.specErr = r.specErr || ''; showBoost(); if (!S.sel || S.sel === 'local') S.sel = 'local';
+  S.running = id; S.slots = r.slots || 1; S.engine = { stage: 'ready', kind: r.kind }; S.spec = !!r.spec; S.specTried = useDraft; S.specErr = r.specErr || ''; S.visionOn = !!r.vision; showBoost(); showVision(); if (!S.sel || S.sel === 'local') S.sel = 'local';
   renderNav(); if (S.tab === 'chat') { const el = $('#estatus'); if (el) el.innerHTML = ''; const mp = $('#mpill'); if (mp) mp.textContent = m.name; } else renderMain();
   Sound.done();
   const sk = id + (r.spec ? '+spec' : '');
@@ -426,6 +438,7 @@ function viewOpt() {
     ['heatCpu', T('oHeatCpu'), T('oHeatCpuD'), `${S.st.cpuLimit || 75}°C`],
     ['engine', T('oEngine'), T('oEngineD'), S.st.engine === 'cpu' ? 'CPU' : 'Vulkan'],
     ['sound', T('oSound'), T('oSoundD'), S.st.sound !== false ? T('on') : T('off')],
+    ['tts', T('oTts'), T('oTtsD'), S.st.tts ? T('on') : T('off')],
     ['theme', T('oTheme'), T('oThemeD'), S.st.theme === 'light' ? T('light') : T('dark')],
     ['tray', T('oTray'), T('oTrayD'), S.st.tray !== false ? T('on') : T('off')],
     ['memory', T('oMemory'), T('oMemoryD'), (S.st.memory || []).length ? `${(S.st.memory || []).length} · ${T('clear')}` : '—'],
@@ -449,6 +462,7 @@ async function toggleOpt(k) {
   if (k === 'load') { await save({ load: S.st.load === false }); P.monitor(S.st.load !== false); }
   if (k === 'engine') await save({ engine: S.st.engine === 'cpu' ? 'vulkan' : 'cpu' });
   if (k === 'sound') await save({ sound: S.st.sound === false });
+  if (k === 'tts') { await save({ tts: !S.st.tts }); if (!S.st.tts) speechSynthesis.cancel(); }
   if (k === 'theme') { await save({ theme: S.st.theme === 'light' ? 'dark' : 'light' }); applyTheme(); }
   if (k === 'tray') await save({ tray: S.st.tray === false });
   if (k === 'trusted') await save({ trustedHosts: [] });
@@ -494,6 +508,7 @@ function viewApi() {
       <span style="display:flex;align-items:center;gap:12px"><span class="mono small apiok">● ${a.err ? esc(a.err) : T('apiOn')}</span><button class="btn ghost sm" data-act="apiDel" data-v="${i}">${T('del')}</button></span></div></div>`).join('')
       : `<div class="muted small">${T('apiNone')}</div>`}
     <label class="field" style="margin-top:28px">${T('searchKey')}<input id="sKey" type="password" class="mono" value="${esc(S.st.searchKey || '')}"></label>
+    <label class="field">${T('pexelsKey')} <button class="cb" data-act="extLink" data-v="https://www.pexels.com/api/">pexels.com/api</button><input id="pKey" type="password" class="mono" value="${esc(S.st.pexelsKey || '')}"></label>
     <button class="btn ghost sm" style="align-self:flex-start" data-act="sKey">${T('save')}</button>
   </div>`;
 }
@@ -555,6 +570,9 @@ function sources() {
   return out;
 }
 const ICON = {
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+  speaker: '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
   bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
   folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
@@ -642,7 +660,7 @@ function viewChat() {
   const srcSel = src.length < 2 ? '' : `<select class="pick" data-act="sel">${src.map(s => `<option value="${s[0]}" ${S.sel === s[0] ? 'selected' : ''}>${esc(s[1])}</option>`).join('')}</select>`;
   const head = `<div class="row fu" style="margin-bottom:12px;gap:8px">
     <div class="chips"><button class="tgl ${auto ? 'on' : ''}" data-act="autoAgent" title="${T('autoAgentD')}"><span class="knob"></span>${T('autoModel')}</button>
-      ${auto ? `<span class="pill" id="apill">${esc(S.lastAgent || T('autoAgentPick'))}</span>` : `<select class="pick" data-act="agentSel">${opts}</select>`}${srcSel}<span class="pill boost" id="bpill" style="display:none"></span><span class="pill mono" id="spill" style="${speedText() ? '' : 'display:none'}">${esc(speedText())}</span><span id="estatus">${S.engine && S.engine.stage !== 'ready' ? engineText() : ''}</span></div>
+      ${auto ? `<span class="pill" id="apill">${esc(S.lastAgent || T('autoAgentPick'))}</span>` : `<select class="pick" data-act="agentSel">${opts}</select>`}${srcSel}<span class="pill boost" id="bpill" style="display:none"></span><span class="pill vis" id="vpill" style="display:none"></span><span class="pill mono" id="spill" style="${speedText() ? '' : 'display:none'}">${esc(speedText())}</span><span id="estatus">${S.engine && S.engine.stage !== 'ready' ? engineText() : ''}</span></div>
     <div class="chips">
       <button class="ibtn" data-act="wsOpen" title="${T('folder')}: ${esc(S.ws || '')}">${ico('folder')}</button>
       <button class="ibtn ${S.panel ? 'on' : ''}" data-act="panel" title="${T('browser')}">${ico('globe')}</button>
@@ -654,7 +672,7 @@ function viewChat() {
   return `<div class="chat">${head}<div class="msgs" id="msgs">${S.msgs.length ? S.msgs.map(msgHTML).join('') : empty}</div>
     <button class="jump" id="jump" data-act="jump" aria-label="down"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></button>
     <div class="attachrow" id="attachrow"></div>
-    <div class="composer fu" style="animation-delay:.15s"><button class="ib attachb" data-act="attach" title="${T('attachT')}" aria-label="attach"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5 12.5 20a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg></button><textarea id="input" rows="1" placeholder="${src.length ? T('placeholder') : T('chatNoModel')}"></textarea>
+    <div class="composer fu" style="animation-delay:.15s"><button class="ib attachb" data-act="attach" title="${T('attachT')}" aria-label="attach"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5 12.5 20a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg></button> <button class="ib micb" id="micb" data-act="mic" title="${T('micT')}" aria-label="mic">${ico('mic', 17)}</button><textarea id="input" rows="1" placeholder="${src.length ? T('placeholder') : T('chatNoModel')}"></textarea>
     <button class="send" data-act="${S.streaming ? 'stop' : 'send'}" aria-label="send">${sendIcon()}</button></div></div>`;
 }
 const sendIcon = () => S.streaming ? '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect width="14" height="14" rx="3" fill="currentColor"/></svg>'
@@ -686,7 +704,7 @@ function msgInner(m) {
   if (m.chain) return chainHTML(m) + `<div class="mrest">${chainRest(m)}</div>`;
   const extra = (m.extra || []).map(a => actLine(a.kind, a.arg, a)).join('');
   let ctx = { acts: m.actions, k: 0, only: m.parts ? ['file', 'run'] : null };
-  if (!m.parts) return (m.agent ? `<div class="alabel">${esc(m.agent)}</div>` : '') + (m.content ? md(stripMem(m.content), ctx) : '') + (m.memNote ? `<div class="memnote">${ico('check', 12)}<span>${esc(m.memNote)}</span></div>` : '') + extra + askHTML(m.ask) + (m.live ? statusHTML(m.status || liveStatus(m.content)) : '');
+  if (!m.parts) return (m.agent ? `<div class="alabel">${esc(m.agent)}</div>` : '') + (m.content ? md(stripMem(m.content), ctx) : '') + (m.memNote ? `<div class="memnote">${ico('check', 12)}<span>${esc(m.memNote)}</span></div>` : '') + extra + askHTML(m.ask) + (m.live ? statusHTML(m.status || liveStatus(m.content)) : ttsBtn(m));
   const st = { wait: T('waiting'), work: T('working'), done: T('done'), error: T('sError') };
   if (m.debate) ctx = { acts: m.actions, k: 0 };
   const pctx = m.debate ? null : ctx;
@@ -695,10 +713,10 @@ function msgInner(m) {
     <span class="mono small muted">${p.status === 'work' ? '<span class="shimmer">' + liveStatus(p.content) + '</span>' : st[p.status]}</span></div><div class="small muted" style="margin-top:4px">${esc(p.task)}</div>
     ${p.content ? `<details ${p.status === 'work' ? 'open' : ''}><summary>···</summary><div class="body">${md(p.content, pctx)}</div></details>` : ''}</div>`).join('');
   const fin = m.stage === 'merge' && !m.content ? statusHTML(m.debate ? T('dbMerge') : T('merging')) : m.content ? `<div style="margin-top:14px">${md(m.debate ? stripMem(m.content) : m.content, m.debate ? ctx : undefined)}</div>` : '';
-  return head + steps + fin + extra + askHTML(m.ask);
+  return head + steps + fin + extra + askHTML(m.ask) + (m.debate && m.stage === 'done' ? ttsBtn(m) : '');
 }
 function msgHTML(m, i) {
-  if (m.role === 'user') return `<div class="msg me">${esc(m.shown != null ? m.shown : m.content)}${(m.files || []).length ? `<div class="mfiles">${m.files.map(f => `<span class="achip">${esc(f.name)}</span>`).join('')}</div>` : ''}</div>`;
+  if (m.role === 'user') return `<div class="msg me">${(m.images || []).length ? `<div class="mimgs">${m.images.map(u => `<img src="${u}" alt="">`).join('')}</div>` : ''}${esc(m.shown != null ? m.shown : m.content)}${(m.files || []).length ? `<div class="mfiles">${m.files.map(f => `<span class="achip">${esc(f.name)}</span>`).join('')}</div>` : ''}</div>`;
   if (m.role === 'tool') return `<div class="msg" data-i="${i}" style="display:none"></div>`;
   if (m.stopped) return `<div class="msg stopped" data-i="${i}">${T('stopped')}</div>`;
   return `<div class="msg" data-i="${i}">${msgInner(m)}</div>`;
@@ -765,14 +783,31 @@ const isTog = sel => /^tog:/.test(sel || ''), isApi = sel => /^api:/.test(sel ||
 function apiT(i) { const a = (S.st.apis || [])[+i]; return a ? { base: a.url, key: a.key, model: a.model, kind: a.kind || 'openai', name: a.name } : null; }
 // "together" answers through the API by default; the local model joins in debate() and in builds
 function target(sel) { sel = sel || S.sel; if (isApi(sel) || isTog(sel)) return apiT(sel.split(':')[1]) || LOCAL_T; return LOCAL_T; }
+const VISION_API = /gpt-4o|gpt-4\.1|gpt-5|\bo[34]\b|o4-mini|claude|gemini|vision|[-_.]vl\b|-vl-|llava|pixtral|grok-(2-vision|4)|llama-4|qwen.*(vl|3\.5|omni)|kimi-k2\.[5-9]|glm-4\.\dv|gemma-?3|gemma-?4|mistral-(medium|small)/i;
+function canSee(sel) {
+  sel = sel || S.sel;
+  if (isApi(sel)) { const t = target(sel); return !!(t && VISION_API.test(t.model)); }
+  const lm = S.running && findM(S.running);
+  if (isTog(sel)) { const t = target(sel); return !!(t && VISION_API.test(t.model)) || !!(lm && lm.vision); }
+  return !!(lm && lm.vision);
+}
+function showVision() {
+  const el = $('#vpill'); if (!el) return; const ok = haveModel() && canSee();
+  el.style.display = haveModel() ? '' : 'none'; el.classList.toggle('on', ok);
+  el.innerHTML = ok ? `${ico('eye', 12)}${T('seesPics')}` : `${ico('eye', 12)}${T('noPics')}`;
+  el.title = ok ? T('seesPicsD') : T('noPicsD');
+}
 const haveModel = () => !!S.running || isApi(S.sel) || (isTog(S.sel) && !!S.running);
 const onlyCloud = () => isApi(S.sel);
 const live = {};
 P.onChunk(({ id, data }) => live[id] && live[id].chunk(data));
 P.onChatEnd(({ id, error }) => live[id] && live[id].end(error));
 let reqSeq = 0;
+const textOnly = msgs => msgs.map(m => Array.isArray(m.content) ? { ...m, content: m.content.filter(c => c.type === 'text').map(c => c.text).join('\n') + '\n[The user attached a picture you cannot see.]' } : m);
 function stream(messages, signal, onDelta, extra, meta) {
   const t = (meta && meta.tgt) || target(); const id = 'r' + (++reqSeq);
+  const sees = t.local ? !!(S.visionOn && findM(S.running)?.vision) : VISION_API.test(t.model || '');
+  if (!sees) messages = textOnly(messages);
   return new Promise((resolve, reject) => {
     let buf = '', all = '', thinking = false, looped = false, checked = 0;
     const emit = c => {
@@ -828,16 +863,17 @@ function toApi(list) {
   list.forEach((m, k) => { if (m.role === 'user') lastUser = k; });
   list = list.filter((m, k) => !(m.role === 'tool' && k < lastUser)).map((m, k) => m.role === 'assistant' && k < lastUser && m.content
     ? { ...m, content: noThink(m.content).replace(/```(file|run|read|list|mkdir|move|open|search|click|type|scroll|back):[^\n`]*\n?[\s\S]*?```/g, '').trim() } : m);
+  const lastU = [...list].reverse().find(m => m.role === 'user');
   for (const m of list) {
     if (m.role === 'tool') out.push({ role: 'user', content: '[Action results]\n' + m.content });
     else if (m.stopped) continue;
     else if (m.role === 'assistant') { const c = noThink(m.content || ''); if (c && !REFUSAL.test(c)) out.push({ role: 'assistant', content: c }); }
-    else if (m.content) out.push({ role: 'user', content: m.content });
+    else if (m.content) out.push({ role: 'user', content: m.content, images: m === lastU ? m.images : undefined });
   }
   const merged = [];
-  for (const m of out) { const p = merged[merged.length - 1]; if (p && p.role === m.role) p.content += '\n\n' + m.content; else merged.push({ ...m }); }
+  for (const m of out) { const p = merged[merged.length - 1]; if (p && p.role === m.role) { p.content += '\n\n' + m.content; if (m.images) p.images = [...(p.images || []), ...m.images]; } else merged.push({ ...m }); }
   while (merged.length && merged[0].role !== 'user') merged.shift();
-  return merged;
+  return merged.map(m => m.images && m.images.length ? { role: m.role, content: [{ type: 'text', text: m.content }, ...m.images.map(u => ({ type: 'image_url', image_url: { url: u } }))] } : { role: m.role, content: m.content });
 }
 
 // --- actions ---
@@ -848,7 +884,8 @@ function parseActions(text) {
   return out;
 }
 S.pending = {};
-function ask(a) { return new Promise(r => { S.pending[a.id] = r; }); }
+const stoppedNow = () => !!(S.streaming && S.streaming.signal && S.streaming.signal.aborted);
+function ask(a) { if (stoppedNow()) return Promise.resolve(false); return new Promise(r => { S.pending[a.id] = r; }); }
 async function doSearch(q) {
   const res = await P.webSearch(q, S.st.searchKey || '');
   return res.length ? res.map((x, i) => `[${i + 1}] ${x.title} — ${x.url}\n${x.text}`).join('\n\n') : '(no results)';
@@ -862,7 +899,7 @@ async function askSiteAction(a, url, repaint) {
   return ok;
 }
 async function askSite(msg, idx, url, label) {
-  if (siteAllowed(url)) return true;
+  if (siteAllowed(url)) return true; if (stoppedNow()) return false;
   const a = { id: 'a' + (++actSeq), site: true, title: label || T('askSite'), files: [hostOf(url)], state: 'ask' }; msg.ask = a; paint(idx); Sound.soft();
   const ok = await new Promise(r => { S.pending[a.id] = r; });
   msg.ask = null; paint(idx); if (ok) (S.allowedHosts ||= new Set()).add(hostOf(url));
@@ -1197,13 +1234,59 @@ function curAgentDef() {
   const a = ourAgents().find(x => x[0] === id) || ourAgents()[0];
   return { id: a[0], name: a[1], prompt: a[3], tools: a[4] };
 }
+async function askChoice(msg, idx, title, desc) {
+  if (stoppedNow()) return false;
+  const a = { id: 'a' + (++actSeq), choice: true, title, desc, state: 'ask' }; msg.ask = a; paint(idx); Sound.soft();
+  const ok = await new Promise(r => { S.pending[a.id] = r; });
+  msg.ask = null; paint(idx); return ok;
+}
+// find a photo for every picture slot of the page and point the slots at img/N.jpg
+async function addPhotos(file, dir, request, signal, p) {
+  let h = file.code; const slots = [];
+  const re = /<div\b[^>]*class=["'][^"']*\bpl-img\b[^"']*["'][^>]*>|<img\b[^>]*>/gi; let m;
+  while ((m = re.exec(h)) && slots.length < 10) {
+    const tag = m[0]; if (/^<img/i.test(tag) && /src=["']data:/i.test(tag)) continue;
+    const lab = (tag.match(/data-label=["']([^"']*)/i) || tag.match(/alt=["']([^"']*)/i) || [])[1] || '', emo = (tag.match(/data-emoji=["']([^"']*)/i) || [])[1] || '';
+    slots.push({ tag, at: m.index, hint: `${lab} ${emo}`.trim() });
+  }
+  if (!slots.length) return [];
+  const title = (h.match(/<title>([^<]*)<\/title>/i) || [])[1] || '';
+  let qs = [];
+  try {
+    const raw = noThink(await stream([{ role: 'system', content: 'You pick stock photos. Answer ONLY with a JSON array of strings: for every picture one short English search query (2-4 words) for a free photo site. Concrete objects, no text, no logos.' },
+      { role: 'user', content: `Website: ${title}. Request: ${request.slice(0, 400)}\nPictures:\n${slots.map((x, i) => `${i + 1}. ${x.hint || '(no hint)'}`).join('\n')}` }], signal, c => { p.content += c; paint(S.msgs.length - 1); }, { temperature: 0.2 }));
+    qs = JSON.parse((raw.match(/\[[\s\S]*\]/) || ['[]'])[0]).map(String);
+  } catch (e) { if (e.name === 'AbortError') throw e; }
+  const used = new Set(), out = [];
+  for (let i = 0; i < slots.length; i++) {
+    const q = (qs[i] || qs[0] || title || 'interior').slice(0, 60);
+    const r = await P.findPhotos(q, 4, S.st.pexelsKey || '').catch(() => null);
+    const ph = r && r.ok && r.photos.find(x => !used.has(x.url)); if (!ph) continue;
+    used.add(ph.url); out.push({ ...ph, rel: `${dir}/img/${out.length + 1}.jpg`, file: `img/${out.length + 1}.jpg`, slot: slots[i] });
+  }
+  // replace from the end so indexes stay valid
+  for (const x of [...out].sort((a, b) => b.slot.at - a.slot.at)) {
+    const t = x.slot.tag; let n;
+    if (/^<img/i.test(t)) n = /\ssrc=/i.test(t) ? t.replace(/\ssrc=(["'])[^"']*\1/i, ` src="${x.file}"`) : t.replace(/^<img/i, `<img src="${x.file}"`);
+    else { n = t.replace(/class=(["'])/i, 'class=$1pl-photo '); n = /\sstyle=(["'])/i.test(n) ? n.replace(/\sstyle=(["'])/i, ` style=$1background-image:url('${x.file}');`) : n.replace(/>$/, ` style="background-image:url('${x.file}')">`); }
+    h = h.slice(0, x.slot.at) + n + h.slice(x.slot.at + t.length);
+  }
+  const by = [...new Set(out.map(x => x.src + (x.by ? ' · ' + x.by : '')))].slice(0, 6).join(', ');
+  const credit = `<p class="pl-credits" style="font-size:12px;opacity:.6;text-align:center;padding:16px">${L() === 'ru' ? 'Фото' : 'Photos'}: ${esc(by)}</p>`;
+  h = /<\/body>/i.test(h) ? h.replace(/<\/body>(?![\s\S]*<\/body>)/i, credit + '\n</body>') : h + credit;
+  file.code = h;
+  return out;
+}
 async function askSave(msg, idx, paths) {
+  if (stoppedNow()) return false;
   const a = { id: 'a' + (++actSeq), files: paths, state: 'ask' }; msg.ask = a; paint(idx); Sound.soft();
   const ok = await new Promise(r => { S.pending[a.id] = r; });
   a.state = ok ? 'done' : 'denied'; paint(idx); return ok;
 }
 function askHTML(a) {
   if (!a || a.state === 'done') return '';
+  if (a.choice) return `<div class="act askcard choice"><div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:16px;color:#fff">${esc(a.title)}</span><span class="small muted">${esc(a.desc || '')}</span></div>
+    <div class="row" style="justify-content:flex-start;gap:8px;margin-top:12px"><button class="cb pri" data-act="allow" data-v="${a.id}">${T('yes')}</button><button class="cb" data-act="deny" data-v="${a.id}">${T('no')}</button></div></div>`;
   if (a.site) return permCard({ type: 'site', id: a.id, host: a.files[0], label: a.title, agent: S.curAgentName });
   if (a.state === 'ask') return permCard({ type: 'save', id: a.id, files: a.files, agent: S.curAgentName });
   const right = a.state === 'ask' ? `<span><button class="cb pri" data-act="allow" data-v="${a.id}">${T('allow')}</button><button class="cb" data-act="deny" data-v="${a.id}">${T('deny')}</button></span>`
@@ -1387,6 +1470,10 @@ async function runChain(text, signal, plan) {
   const part = (name, task, status) => { const p = { name, task, status: status || 'work', content: '' }; msg.parts.push(p); paint(idx); return p; };
   const waitCool = async () => { if (!S.temps?.hot || onlyCloud()) return; msg.chain.cooling = true; paint(idx); await cool(signal); msg.chain.cooling = false; paint(idx); };
   stage('accept'); await new Promise(r => setTimeout(r, 350));
+  // ask once: real photos on the site? (taken from Openverse / Pexels and saved next to the site)
+  let wantPhotos = false;
+  if (plan.site && !plan.edit) wantPhotos = await askChoice(msg, idx, T('phAsk'), S.st.pexelsKey ? T('phAskP') : T('phAskO'));
+  if (signal.aborted) return;
   let brief = '';
   const browser = def('browser'), coder = def('coder');
   // 1. look at the examples / research
@@ -1452,6 +1539,8 @@ async function runChain(text, signal, plan) {
     const sys = coder[3] + (kit ? DESIGN.prompt(designTheme(), lang) + '\nThese design-system rules override any CSS advice above.' : '') + (plan.site
       ? ` Output ONLY one complete HTML file in a single \`\`\`html block (all CSS and JS inside), then one short sentence.${pages.length > 1 ? ` This is page "${pg.file}" of a site with pages: ${nav}. Every page has the same header with links to all pages, the same footer, colors and fonts.` : ''}`
       : ' Output the complete program in one code block, then a short explanation of how to run it.') + ` Never say you cannot save or open files. Answer in ${lang}.`;
+    const lastU = [...S.msgs].reverse().find(m => m.role === 'user'), pics = (lastU && lastU.images) || [];
+    const withPics = c => pics.length ? [{ type: 'text', text: c + '\n\nThe attached picture is the design reference.' }, ...pics.map(u => ({ type: 'image_url', image_url: { url: u } }))] : c;
     const shots = kit && !pg.code ? DESIGN.pickExamples(text, onlyCloud() ? 3 : (S.runPlan?.ctx || 8192) >= 12288 ? 2 : 1).flatMap(e => [{ role: 'user', content: 'Request: ' + e.q }, { role: 'assistant', content: '```html\n<!DOCTYPE html>\n<html lang="ru">\n<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + e.q.slice(0, 40) + '</title></head>\n<body>\n' + e.a + '\n</body>\n</html>\n```\nГотово.' }]) : [];
     const user = pg.code ? `Change request: ${text}\n\nCurrent code of ${pg.file} (keep everything that was not asked to change, return the whole updated file):\n\`\`\`${plan.site ? 'html' : ''}\n${DESIGN.strip(pg.code).slice(0, 24000)}\n\`\`\`` : `Request: ${text}${pages.length > 1 ? `\n\nThis page: ${pg.file} — ${pg.title}. Content: ${pg.purpose}` : ''}${brief ? `\n\nDesign reference from the examples (recreate this style and structure with the user's own content):\n${brief.slice(0, 5000)}` : ''}`;
     const meta = {};
@@ -1459,14 +1548,14 @@ async function runChain(text, signal, plan) {
       // the local model builds its own version in parallel; the version with fewer problems wins
       p.name = 'API · ' + p.name;
       const q = part(`${T('srcPc')} · ${coder[1]}${pages.length > 1 ? ' #' + (k + 1) : ''}`, p.task); const lm = {};
-      const mine = (async () => { try { await stream([{ role: 'system', content: sys }, ...shots, { role: 'user', content: user }], signal, c => { q.content += c; paint(idx); }, { temperature: 0.3 }, { tgt: LOCAL_T }); } catch (e) { if (e.name === 'AbortError') throw e; } q.status = 'done'; paint(idx); })();
-      await Promise.all([mine, stream([{ role: 'system', content: sys }, ...shots, { role: 'user', content: user }], signal, c => { p.content += c; paint(idx); }, { temperature: 0.3 }, meta).catch(e => { if (e.name === 'AbortError') throw e; })]);
+      const mine = (async () => { try { await stream([{ role: 'system', content: sys }, ...shots, { role: 'user', content: withPics(user) }], signal, c => { q.content += c; paint(idx); }, { temperature: 0.3 }, { tgt: LOCAL_T }); } catch (e) { if (e.name === 'AbortError') throw e; } q.status = 'done'; paint(idx); })();
+      await Promise.all([mine, stream([{ role: 'system', content: sys }, ...shots, { role: 'user', content: withPics(user) }], signal, c => { p.content += c; paint(idx); }, { temperature: 0.3 }, meta).catch(e => { if (e.name === 'AbortError') throw e; })]);
       p.status = 'done';
       const A = extractCode(p.content, plan.site), Bc = extractCode(q.content, plan.site);
       if (A && Bc) { const [pa, pb] = await Promise.all([autoCheck(A, plan.site), autoCheck(Bc, plan.site)]); const win = pb.length < pa.length || (pb.length === pa.length && Bc.code.length > A.code.length * 1.3) ? Bc : A; (win === A ? p : q).task += ' · ' + T('dbWin'); paint(idx); return win; }
       paint(idx); return A || Bc;
     }
-    await stream([{ role: 'system', content: sys }, ...shots, { role: 'user', content: user }], signal, c => { p.content += c; paint(idx); }, { temperature: 0.3 }, meta);
+    await stream([{ role: 'system', content: sys }, ...shots, { role: 'user', content: withPics(user) }], signal, c => { p.content += c; paint(idx); }, { temperature: 0.3 }, meta);
     if (meta.finish === 'loop') p.content = p.content.slice(0, p.content.length - (meta.loopCut || 0));
     for (let r = 0; r < 4 && meta.finish === 'length'; r++) {
       meta.finish = null;
@@ -1515,10 +1604,13 @@ async function runChain(text, signal, plan) {
   } else {
     for (const c of valid) { const n = progName(c, text); files.push({ path: await uniqueName(`${n.nm}.${n.ext}`), code: c.code }); }
   }
+  let photos = [];
+  if (wantPhotos && plan.site && !proj && files[0]) { const p = part(T('phAgent'), T('phFind')); try { photos = await addPhotos(files[0], dir, text, signal, p); } catch (e) { if (e.name === 'AbortError') throw e; } p.task = photos.length ? T('phFound')(photos.length) : T('phNone'); p.status = 'done'; paint(idx); }
   if (plan.site && designOn()) files.forEach(f => { if (/\.html?$/i.test(f.path)) f.code = DESIGN.apply(f.code, designTheme()); });
-  const ok = await askSave(msg, idx, files.map(f => f.path));
+  const ok = await askSave(msg, idx, [...files.map(f => f.path), ...photos.map(x => x.rel)]);
   if (ok) {
     for (const f of files) await P.ws.write(f.path, f.code);
+    await Promise.all(photos.map(x => P.wsDownload(x.url, x.rel, x.thumb).catch(() => null)));
     msg.extra = files.map(f => ({ id: 'a' + (++actSeq), kind: 'file', arg: f.path, state: 'done' }));
     S.lastProject = { dir, site: plan.site, files: proj ? proj.files : files.map(f => f.path) };
     if (plan.site) rememberProject(dir, S.lastProject.files, ((files[0].code.match(/<title>([^<]*)<\/title>/i) || [])[1] || dir).trim()).catch(() => {});
@@ -1544,12 +1636,16 @@ async function openChat(id) {
 }
 S.attach = [];
 function addAttach(list) {
-  for (const f of list || []) { if (f.error) toast(`${f.name}: ${f.error}`); else if (S.attach.length < 6) S.attach.push(f); }
+  for (const f of list || []) {
+    if (f.error) toast(`${f.name}: ${f.error}`);
+    else if (f.image && !canSee()) toast(T('noPicsD'));
+    else if (S.attach.length < 6) S.attach.push(f);
+  }
   drawAttach();
 }
 function drawAttach() {
   const el = document.getElementById('attachrow'); if (!el) return;
-  el.innerHTML = S.attach.map((f, i) => `<span class="achip">${esc(f.name)}<span class="mono">${(f.size / 1024).toFixed(0)} KB</span><button class="bx" data-act="unattach" data-v="${i}" aria-label="remove">${ico('x', 10)}</button></span>`).join('');
+  el.innerHTML = S.attach.map((f, i) => `<span class="achip">${f.image ? `<img src="${f.image}" alt="">` : ''}${esc(f.name)}<span class="mono">${(f.size / 1024).toFixed(0)} KB</span><button class="bx" data-act="unattach" data-v="${i}" aria-label="remove">${ico('x', 10)}</button></span>`).join('');
 }
 document.addEventListener('dragover', e => { if (e.target.closest && e.target.closest('.chat')) { e.preventDefault(); } });
 document.addEventListener('drop', async e => {
@@ -1557,24 +1653,78 @@ document.addEventListener('drop', async e => {
   const paths = [...(e.dataTransfer.files || [])].map(f => P.pathForFile(f)).filter(Boolean);
   if (paths.length) addAttach(await P.readFiles(paths));
 });
+// --- voice: record -> 16 kHz wav -> whisper on the PC ---
+const V = { rec: null, chunks: [], busy: false };
+function micState(st) { const b = $('#micb'); if (!b) return; b.classList.toggle('rec', st === 'rec'); b.classList.toggle('busy', st === 'busy'); b.title = st === 'rec' ? T('micStop') : st === 'busy' ? T('micBusy') : T('micT'); }
+async function toggleMic() {
+  if (V.busy) return;
+  if (V.rec) { V.rec.stop(); return; }
+  const st = await P.voiceStatus();
+  if (!st.exe || !st.model) {
+    if (!confirm(T('micSetup'))) return;
+    V.busy = true; micState('busy'); toast(T('micDl'));
+    const r = await P.voiceSetup(); V.busy = false; micState('');
+    if (!r.ok) { toast(T('dlError') + ': ' + r.error); return; }
+    toast(T('micReady'));
+  }
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } }); }
+  catch (e) { toast(T('micNo')); return; }
+  V.chunks = []; V.rec = new MediaRecorder(stream);
+  V.rec.ondataavailable = e => e.data.size && V.chunks.push(e.data);
+  V.rec.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop()); V.rec = null; V.busy = true; micState('busy');
+    try {
+      const wav = await toWav16k(new Blob(V.chunks));
+      const r = await P.transcribe(wav, L());
+      if (r.ok && r.text) { const ta = $('#input'); if (ta) { ta.value = (ta.value ? ta.value + ' ' : '') + r.text; ta.dispatchEvent(new Event('input', { bubbles: true })); ta.focus(); } }
+      else toast(r.ok ? T('micEmpty') : T('micErr') + ': ' + r.error);
+    } catch (e) { toast(T('micErr') + ': ' + (e.message || e)); }
+    V.busy = false; micState('');
+  };
+  V.rec.start(); micState('rec'); Sound.tick(1500);
+}
+async function toWav16k(blob) {
+  const ac = new AudioContext(); const buf = await ac.decodeAudioData(await blob.arrayBuffer()); ac.close();
+  const off = new OfflineAudioContext(1, Math.ceil(buf.duration * 16000), 16000);
+  const src = off.createBufferSource(); src.buffer = buf; src.connect(off.destination); src.start();
+  const pcm = (await off.startRendering()).getChannelData(0);
+  const out = new DataView(new ArrayBuffer(44 + pcm.length * 2)); const w = (o, s) => [...s].forEach((c, i) => out.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); out.setUint32(4, 36 + pcm.length * 2, true); w(8, 'WAVE'); w(12, 'fmt '); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
+  out.setUint32(24, 16000, true); out.setUint32(28, 32000, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true); w(36, 'data'); out.setUint32(40, pcm.length * 2, true);
+  for (let i = 0; i < pcm.length; i++) out.setInt16(44 + i * 2, Math.max(-1, Math.min(1, pcm[i])) * 32767, true);
+  return out.buffer;
+}
+// read answers aloud with the Windows voices
+function speakText(t) {
+  const s = noThink(stripMem(t || '')).replace(/```[\s\S]*?```/g, ' ').replace(/[*#`>_]/g, '').replace(/https?:\/\/\S+/g, '').trim(); if (!s) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(s.slice(0, 4000)); const lang = L() === 'ru' ? 'ru' : 'en';
+  const v = speechSynthesis.getVoices().filter(x => x.lang.toLowerCase().startsWith(lang)); if (v.length) u.voice = v.find(x => /natural|online|svetlana|dmitry|irina|pavel/i.test(x.name)) || v[0];
+  u.lang = lang === 'ru' ? 'ru-RU' : 'en-US'; u.rate = 1.03; speechSynthesis.speak(u);
+}
+const ttsBtn = m => !m.live && m.role === 'assistant' && noThink(m.content || '').trim() ? `<button class="ttsb" data-act="speak" title="${T('speakT')}">${ico('speaker', 14)}</button>` : '';
 function lockComposer(on) {
   const ta = $('#input'); if (!ta) return;
   ta.disabled = on; ta.placeholder = on ? T('agentsWorking') : T('placeholder');
 }
 async function sendMsg() {
   const ta = $('#input'); const typed = ta.value.trim(); if ((!typed && !S.attach.length) || S.streaming) return;
-  const files = S.attach.splice(0); drawAttach();
+  const all = S.attach.splice(0); drawAttach();
+  const images = all.filter(f => f.image).map(f => f.image), files = all.filter(f => !f.image);
+  if (images.length && !canSee()) { toast(T('noPicsD')); return; }
   const text = (typed || T('attachAsk')) + files.map(f => `\n\n[Attached file: ${f.name}${f.cut ? ' (cut)' : ''}]\n\`\`\`\n${f.text}\n\`\`\``).join('');
   S.allowAll = false; S.allowedHosts = new Set();
-  if (!files.length && /^(открой|открыть|покажи|open)?\s*(браузер|browser)\s*(открой|открыть|open)?[.!]*$/i.test(typed)) {
+  if (!all.length && /^(открой|открыть|покажи|open)?\s*(браузер|browser)\s*(открой|открыть|open)?[.!]*$/i.test(typed)) {
     ta.value = ''; S.msgs.push({ role: 'user', content: typed, shown: typed }); addMsg(S.msgs.length - 1);
     if (!S.panel) openPanel(); S.msgs.push({ role: 'assistant', content: T('browserOpened') }); addMsg(S.msgs.length - 1); Sound.done(); saveChat().catch(() => {}); return;
   }
-  const url = files.length ? null : openIntent(typed);
+  const url = all.length ? null : openIntent(typed);
   if (url) S.lastLinks = [url];
   if (!haveModel() && !url) { toast(T('chatNoModel')); return; }
   ta.value = ''; ta.style.height = 'auto';
-  S.msgs.push({ role: 'user', content: text, shown: typed, files: files.map(f => ({ name: f.name, size: f.size })) }); addMsg(S.msgs.length - 1);
+  if (images.length && !isApi(S.sel) && !(await ensureVision())) return;
+  S.msgs.push({ role: 'user', content: text, shown: typed, images: images.length ? images : undefined, files: files.map(f => ({ name: f.name, size: f.size })) }); addMsg(S.msgs.length - 1);
   const ctl = new AbortController(); S.streaming = ctl; setSendBtn(); lockComposer(true); Sound.soft();
   const from = S.msgs.length;
   const auto = S.st.autoAgent !== false;
@@ -1628,6 +1778,7 @@ async function sendMsg() {
   S.streaming = null; setSendBtn(); lockComposer(false); stopped ? Sound.tick(900) : Sound.done(); $('#input')?.focus();
   saveChat().catch(() => {});
   if (!stopped) P.notify('PULSAR', T('notifyDone')).catch(() => {});
+  if (!stopped && S.st.tts) { const last = [...S.msgs].reverse().find(m => m.role === 'assistant' && (m.content || '').trim()); if (last) speakText(last.content); }
 }
 
 // ---------- events ----------
@@ -1672,7 +1823,7 @@ root.addEventListener('click', async e => {
       S._lastTab = 'api'; renderMain(); break;
     }
     case 'apiDel': { const l = [...(S.st.apis || [])]; l.splice(+v, 1); await save({ apis: l }); if (/^(api|tog):/.test(S.sel || '')) { S.sel = null; await save({ sel: null }); } Sound.tick(1200); S._lastTab = 'api'; renderMain(); break; }
-    case 'sKey': await save({ searchKey: $('#sKey').value.trim() }); toast(T('saved')); break;
+    case 'sKey': await save({ searchKey: $('#sKey').value.trim(), pexelsKey: ($('#pKey')?.value || '').trim() }); toast(T('saved')); break;
     case 'newChat': S.streaming?.abort(); S.msgs = []; S.chatId = null; S.lastProject = null; S._lastTab = null; renderNav(); renderMain(); break;
     case 'openChat': if (!e.target.closest('.bx')) openChat(v); break;
     case 'delChat': await P.chats.del(v); if (S.chatId === v) { S.chatId = null; S.msgs = []; if (S.tab === 'chat') { S._lastTab = null; renderMain(); } } S.chats = await P.chats.list(); renderNav(); break;
@@ -1685,6 +1836,8 @@ root.addEventListener('click', async e => {
       renderNav(); renderMain(); toast(T('ended')); break;
     case 'send': sendMsg(); break;
     case 'boostRetry': if (S.running && !S.streaming) { const id = S.running; toast(T('bApply')); startModel(id); } break;
+    case 'mic': toggleMic(); break;
+    case 'speak': { const i = +b.closest('.msg')?.dataset.i; if (speechSynthesis.speaking) { speechSynthesis.cancel(); break; } if (S.msgs[i]) speakText(S.msgs[i].content); break; }
     case 'jump': { S.follow = true; const box = $('#msgs'); if (box) { box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' }); S._auto = true; } showJump(); break; }
     case 'stop': S.streaming?.abort(); Object.values(S.pending).forEach(r => r(false)); S.pending = {}; break;
     case 'allow': case 'deny': { const r = S.pending[v]; delete S.pending[v]; r && r(b.dataset.act === 'allow'); break; }
@@ -1751,7 +1904,7 @@ document.addEventListener('keydown', e => {
 });
 root.addEventListener('change', async e => {
   const t = e.target;
-  if (t.dataset.act === 'sel') { S.sel = t.value; save({ sel: t.value }); Sound.tick(1500); }
+  if (t.dataset.act === 'sel') { S.sel = t.value; save({ sel: t.value }); Sound.tick(1500); showVision(); }
   if (t.dataset.act === 'agentSel') { await save({ agent: t.value }); Sound.tick(1500); }
 });
 root.addEventListener('keydown', e => {
@@ -1795,4 +1948,5 @@ function applyTheme() { document.documentElement.classList.toggle('light', S.st.
   if (S.st.agent === 'team' || !['chat', 'coder', 'files', 'browser'].includes(S.st.agent || 'coder')) await save({ agent: 'chat' });
   if (S.st.lang) document.documentElement.lang = S.st.lang;
   if (!S.st.lang) langScreen(); else intro();
+  setTimeout(() => P.bootOk(), 1500);
 })();

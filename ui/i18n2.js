@@ -210,3 +210,18 @@ Object.assign(I18N.ru, { tDesign: 'Дизайн', designSub: 'Как агент�
 Object.assign(I18N.en, { tDesign: 'Design', designSub: 'How agents style websites. Ready shadcn/ui-style blocks: the model builds the page from them and PULSAR adds the styles and animations — sites look clean even with small models.',
   designMode: 'Design mode', designOnD: 'On: sites are built from ready blocks in the chosen style.', designOffD: 'Off: the model styles the site on its own.',
   designStyles: 'Style', designChosen: 'selected', designPreview: 'Preview', designBlocks: (b, e) => `Blocks · ${b} · examples for the model: ${e}` });
+
+Object.assign(I18N.ru, { seesPics: 'видит картинки', noPics: 'без картинок', seesPicsD: 'Можно прикрепить фото или скриншот — модель его увидит. Другие файлы тоже можно.',
+  noPicsD: 'Эта модель не видит картинки — фото прикрепить нельзя, другие файлы можно. Картинки видят модели с пометкой «видит картинки».',
+  visDl: 'Докачиваю модели «зрение» — это один раз', visNone: 'Для этой модели нет файла зрения', visOn: 'Включаю зрение модели — перезапуск',
+  yes: 'Да', no: 'Нет', phAsk: 'Добавить на сайт настоящие фото?', phAskO: 'Возьму бесплатные фото с Openverse и сохраню их в папку сайта. Нужен интернет.', phAskP: 'Возьму фото с Pexels по твоему ключу и сохраню их в папку сайта.',
+  phAgent: 'PULSAR · фото', phFind: 'подбираю фото', phFound: n => `фото: ${n}`, phNone: 'фото не нашлись — оставил заглушки', pexelsKey: 'Ключ Pexels для фото на сайтах (необязательно, бесплатно)',
+  micT: 'Сказать голосом', micStop: 'Остановить запись', micBusy: 'Распознаю…', micSetup: 'Для голоса нужно один раз скачать модель распознавания речи (≈470 МБ). Скачать?', micDl: 'Качаю распознавание речи…', micReady: 'Голос готов — нажми микрофон ещё раз',
+  micNo: 'Нет доступа к микрофону', micEmpty: 'Ничего не расслышал', micErr: 'Не удалось распознать', speakT: 'Прочитать вслух', oTts: 'Озвучивать ответы', oTtsD: 'PULSAR читает ответы вслух голосом Windows' });
+Object.assign(I18N.en, { seesPics: 'sees pictures', noPics: 'no pictures', seesPicsD: 'You can attach a photo or screenshot — the model will see it. Other files work too.',
+  noPicsD: 'This model cannot see pictures — photos cannot be attached, other files can. Models marked "sees pictures" can.',
+  visDl: 'Downloading the vision part of the model — once', visNone: 'No vision file for this model', visOn: 'Turning on vision — restarting the model',
+  yes: 'Yes', no: 'No', phAsk: 'Add real photos to the site?', phAskO: 'I will take free photos from Openverse and save them into the site folder. Needs internet.', phAskP: 'I will take photos from Pexels with your key and save them into the site folder.',
+  phAgent: 'PULSAR · photos', phFind: 'picking photos', phFound: n => `photos: ${n}`, phNone: 'no photos found — kept placeholders', pexelsKey: 'Pexels key for site photos (optional, free)',
+  micT: 'Speak', micStop: 'Stop recording', micBusy: 'Recognizing…', micSetup: 'Voice needs a one-time download of the speech model (≈470 MB). Download?', micDl: 'Downloading speech recognition…', micReady: 'Voice is ready — press the mic again',
+  micNo: 'No access to the microphone', micEmpty: 'Heard nothing', micErr: 'Could not recognize', speakT: 'Read aloud', oTts: 'Read answers aloud', oTtsD: 'PULSAR reads answers with a Windows voice' });

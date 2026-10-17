@@ -35,6 +35,10 @@ No account, no subscription — download a model and start building. Connect clo
 
 - **Design mode.** Websites are built from 25 ready shadcn/ui-style blocks (hero, pricing, menu, reviews, FAQ, dashboard…) in one of four styles — Apple minimalism, dark tech / neon, glass and soft colors, clean corporate. PULSAR adds the CSS and the animations, so even a small model makes a clean site. Can be turned off.
 - **Any cloud API.** Paste a key from OpenRouter, Groq, Gemini, Claude, OpenAI, DeepSeek, xAI and others — PULSAR detects the provider, lists the models and checks that they answer. In chat pick the PC model, an API model, or **Together**: both answer, review each other and the best final answer comes out.
+- **Vision.** Models marked "sees pictures" (Gemma 4, Qwen3.5 9B, and vision API models) understand photos and screenshots — "make a site like this screenshot".
+- **Real photos on sites.** On request PULSAR picks photos from Openverse (or Pexels with your free key) and saves them next to the site.
+- **Voice.** Speak instead of typing — Whisper runs on your PC. Answers can be read aloud.
+- **Safe updates.** API keys are encrypted with Windows. If a new version fails to start twice, PULSAR rolls back to the last one that worked.
 - **Boosters.** Small helper models make big ones answer 1.5–2× faster (speculative decoding) — downloaded and plugged in automatically.
 - **Loop guard.** If a model starts repeating itself, PULSAR stops it.
 
@@ -117,6 +121,10 @@ In PULSAR open **Optimization → Report a problem**. It saves a report file (ve
 - Перед сохранением на компьютер всегда спрашивает разрешение.
 - **Режим дизайна:** сайты собираются из 25 готовых блоков в стиле shadcn/ui, 4 стиля (минимализм Apple, тёмный tech / неон, стекло, корпоративный), стили и анимации PULSAR добавляет сам. Можно выключить.
 - **Любые облачные API:** вставь ключ — PULSAR сам поймёт сервис, покажет модели и проверит их. В чате: модель на ПК, модель по API или «Вместе» — обе отвечают, спорят и выдают лучший итог.
+- **Модели видят картинки** (Gemma 4, Qwen3.5 9B и API-модели со зрением): «сделай сайт как на скрине».
+- **Настоящие фото на сайтах** с Openverse или Pexels — сохраняются в папку сайта.
+- **Голос:** говоришь вместо того, чтобы печатать (Whisper на ПК), ответы можно слушать.
+- **Ключи API зашифрованы**, а если новая версия не запустится дважды — PULSAR сам вернёт прошлую.
 - **Ускорители** — маленькие модели-помощники, ответы быстрее в 1,5–2 раза.
 - Защита от перегрева (порог для видеокарты и процессора, по умолчанию 75 °C), защита от зацикливания, история чатов, докачка моделей, автообновления.
 

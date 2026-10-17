@@ -20,6 +20,8 @@ jobs:
       - run: npm ci
       - name: Download llama.cpp engine
         run: node scripts/fetch-engine.js
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build installer and publish release
         run: npx electron-builder --win --publish always
         env:

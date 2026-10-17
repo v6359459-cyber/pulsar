@@ -11,8 +11,19 @@ const SETTINGS = () => path.join(DATA(), 'settings.json');
 const PORT = 18089;
 let win, server = null, serverInfo = null;
 
-function readSettings() { try { return JSON.parse(fs.readFileSync(SETTINGS(), 'utf8')); } catch { return {}; } }
-function writeSettings(s) { fs.mkdirSync(DATA(), { recursive: true }); fs.writeFileSync(SETTINGS(), JSON.stringify(s, null, 2)); }
+// API keys are stored encrypted with Windows DPAPI (Electron safeStorage); the UI works with plain values in memory
+const canEnc = () => { try { return require('electron').safeStorage.isEncryptionAvailable(); } catch { return false; } };
+const enc = v => { if (!v || String(v).startsWith('enc:') || !canEnc()) return v; return 'enc:' + require('electron').safeStorage.encryptString(String(v)).toString('base64'); };
+const dec = v => { if (!v || !String(v).startsWith('enc:')) return v; try { return require('electron').safeStorage.decryptString(Buffer.from(String(v).slice(4), 'base64')); } catch { return ''; } };
+function secrets(s, f) {
+  const o = { ...s };
+  if (Array.isArray(o.apis)) o.apis = o.apis.map(a => a && a.key ? { ...a, key: f(a.key) } : a);
+  if (o.searchKey) o.searchKey = f(o.searchKey);
+  if (o.pexelsKey) o.pexelsKey = f(o.pexelsKey);
+  return o;
+}
+function readSettings() { try { return secrets(JSON.parse(fs.readFileSync(SETTINGS(), 'utf8')), dec); } catch { return {}; } }
+function writeSettings(s) { fs.mkdirSync(DATA(), { recursive: true }); fs.writeFileSync(SETTINGS(), JSON.stringify(secrets(s, enc), null, 2)); }
 function send(ch, d) { if (win && !win.isDestroyed()) win.webContents.send(ch, d); }
 
 function createWindow() {
@@ -29,8 +40,45 @@ function createWindow() {
 
 app.whenReady().then(() => {
   for (const d of Object.values(DIRS())) fs.mkdirSync(d, { recursive: true });
+  try { if (fs.existsSync(SETTINGS())) writeSettings(readSettings()); } catch {}
+  if (bootCheck()) return;
   createWindow();
 });
+
+// ---------- rollback: two failed starts of a new version -> install the last version that worked ----------
+const REPO = 'v6359459-cyber/pulsar';
+const BOOT = () => path.join(DATA(), 'boot.json');
+const readBoot = () => { try { return JSON.parse(fs.readFileSync(BOOT(), 'utf8')); } catch { return {}; } };
+const writeBoot = b => { try { fs.mkdirSync(DATA(), { recursive: true }); fs.writeFileSync(BOOT(), JSON.stringify(b)); } catch {} };
+function bootCheck() {
+  const v = app.getVersion(); let b = readBoot();
+  if (b.version !== v) b = { ...b, version: v, fails: 0, pending: false };
+  if (b.pending) b.fails = (b.fails || 0) + 1;
+  b.pending = true; writeBoot(b);
+  const force = process.env.PULSAR_TEST_ROLLBACK;
+  if ((app.isPackaged || force) && b.fails >= 2 && b.okVersion && b.okVersion !== v) { rollback(b.okVersion, v); return true; }
+  return false;
+}
+ipcMain.on('boot:ok', () => { const v = app.getVersion(); writeBoot({ ...readBoot(), version: v, pending: false, fails: 0, okVersion: v }); });
+async function rollback(okV, badV) {
+  writeBoot({ ...readBoot(), blocked: badV, pending: false, fails: 0 });
+  const w = new BrowserWindow({ width: 520, height: 260, frame: false, resizable: false, backgroundColor: '#000000', show: true });
+  const page = t => 'data:text/html;charset=utf-8,' + encodeURIComponent(`<body style="margin:0;background:#000;color:#fff;font:300 18px/1.5 Segoe UI,system-ui,sans-serif;display:flex;flex-direction:column;justify-content:center;height:100vh;padding:0 40px;box-sizing:border-box"><div style="font-size:13px;letter-spacing:.4em;color:#777;margin-bottom:14px">PULSAR</div><div id="t">${t}</div></body>`);
+  const say = t => { try { w.webContents.executeJavaScript(`document.getElementById('t').innerHTML=${JSON.stringify(t)}`); } catch {} };
+  await w.loadURL(page(`Версия ${badV} не запускается.<br>Возвращаю ${okV}…`));
+  try {
+    const url = process.env.PULSAR_TEST_ROLLBACK || `https://github.com/${REPO}/releases/download/v${okV}/PULSAR-Setup-${okV}.exe`;
+    const exe = path.join(app.getPath('temp'), `PULSAR-Setup-${okV}.exe`);
+    await download(url, exe, (g, t) => say(`Версия ${badV} не запускается.<br>Возвращаю ${okV}… ${t ? Math.floor(g / t * 100) : 0}%`));
+    say(`Устанавливаю ${okV}…`);
+    if (!process.env.PULSAR_TEST_ROLLBACK) spawn(exe, ['/S', '--force-run'], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    fs.appendFileSync(path.join(DATA(), 'app.log'), `[rollback] ${badV} -> ${okV}\n`);
+    setTimeout(() => app.exit(0), 1200);
+  } catch (e) {
+    say(`Не получилось вернуть версию: ${String(e.message || e).slice(0, 120)}<br>Запускаю как есть…`);
+    setTimeout(() => { w.close(); createWindow(); }, 2500);
+  }
+}
 app.on('window-all-closed', () => { stopServer(); app.quit(); });
 
 // ---------- settings ----------
@@ -115,9 +163,32 @@ ipcMain.handle('model:download', async (_e, { id, repo, repos, quant }) => {
   } catch (e) { return { ok: false, error: String(e.message || e) }; }
   finally { delete jobs[id]; }
 });
+// vision helper file (mmproj) for models that can see pictures
+ipcMain.handle('model:mmproj', async (_e, { id, repos }) => {
+  const dest = path.join(DIRS().models, id + '.mmproj');
+  if (fs.existsSync(dest)) return { ok: true };
+  const key = id + ':mmproj'; if (jobs[key]) return { ok: false, error: 'already' };
+  const ctl = new AbortController(); jobs[key] = ctl;
+  try {
+    let file = null, repo = null;
+    for (const r of repos || []) {
+      try {
+        const info = await (await fetch(`https://huggingface.co/api/models/${r}`, { signal: ctl.signal })).json();
+        const mm = (info.siblings || []).map(x => x.rfilename).filter(f => /mmproj/i.test(f) && f.endsWith('.gguf'));
+        const pick = ['q8_0', 'f16', 'bf16', 'f32'].map(q => mm.find(f => f.toLowerCase().includes(q))).find(Boolean) || mm[0];
+        if (pick) { file = pick; repo = r; break; }
+      } catch (e) { if (ctl.signal.aborted) throw e; }
+    }
+    if (!file) return { ok: false, none: true };
+    await download(`https://huggingface.co/${repo}/resolve/main/${encodeURI(file)}`, dest, (g, t) => send('model:progress', { id: key, got: g, total: t }), ctl.signal);
+    return { ok: true };
+  } catch (e) { return { ok: false, error: String(e.message || e) }; }
+  finally { delete jobs[key]; }
+});
+ipcMain.handle('model:hasMmproj', (_e, id) => fs.existsSync(path.join(DIRS().models, id + '.mmproj')));
 ipcMain.handle('model:cancel', (_e, id) => { if (jobs[id]) jobs[id].abort(); return true; });
 ipcMain.handle('model:local', () => fs.readdirSync(DIRS().models).filter(f => f.endsWith('.gguf')).map(f => f.replace(/\.gguf$/, '')));
-ipcMain.handle('model:delete', (_e, id) => { if (serverInfo && serverInfo.id === id) stopServer(); for (const f of [id + '.gguf', id + '.gguf.part']) { try { fs.unlinkSync(path.join(DIRS().models, f)); } catch {} } return true; });
+ipcMain.handle('model:delete', (_e, id) => { if (serverInfo && serverInfo.id === id) stopServer(); for (const f of [id + '.gguf', id + '.gguf.part', id + '.mmproj', id + '.mmproj.part']) { try { fs.unlinkSync(path.join(DIRS().models, f)); } catch {} } return true; });
 ipcMain.handle('model:partial', () => { const o = {}; for (const f of fs.readdirSync(DIRS().models)) if (f.endsWith('.gguf.part')) { try { o[f.replace(/\.gguf\.part$/, '')] = fs.statSync(path.join(DIRS().models, f)).size; } catch {} } return o; });
 ipcMain.handle('open:models', () => shell.openPath(DIRS().models));
 
@@ -179,7 +250,8 @@ async function launch(kind, opts) {
   if (opts.slots > 1) { args.push('-np', String(opts.slots)); args[args.indexOf('-c') + 1] = String((opts.ctx || 4096) * opts.slots); }
   if (opts.cpuMoe && kind === 'vulkan') args.push('--cpu-moe');
   if (opts.kv !== false) args.push('-fa', 'on', '-ctk', 'q8_0', '-ctv', 'q8_0');
-  if (opts.draft) { const dp = path.join(DIRS().models, opts.draft + '.gguf'); if (fs.existsSync(dp)) args.push('-md', dp, '-ngld', kind === 'vulkan' ? '99' : '0', '--draft-max', '16', '--draft-min', '1'); }
+  if (opts.mmproj) { const mp = path.join(DIRS().models, opts.id + '.mmproj'); if (fs.existsSync(mp)) args.push('--mmproj', mp); }
+  if (opts.draft && !opts.mmproj) { const dp = path.join(DIRS().models, opts.draft + '.gguf'); if (fs.existsSync(dp)) args.push('-md', dp, '-ngld', kind === 'vulkan' ? '99' : '0', '--draft-max', '16', '--draft-min', '1'); }
   send('engine:status', { stage: 'load', kind });
   let log = '';
   const logFile = path.join(DATA(), 'engine.log');
@@ -214,9 +286,9 @@ ipcMain.handle('engine:start', async (_e, opts) => {
   for (const [kind, o] of tries) {
     try {
       await launch(kind, o);
-      serverInfo = { id: opts.id, kind, port: PORT, ngl: o.ngl, slots: o.slots || 1 };
+      serverInfo = { id: opts.id, kind, port: PORT, ngl: o.ngl, slots: o.slots || 1, vision: !!o.mmproj };
       send('engine:status', { stage: 'ready', kind });
-      return { ok: true, kind, port: PORT, slots: o.slots || 1, spec: !!o.draft, specErr };
+      return { ok: true, kind, port: PORT, slots: o.slots || 1, spec: !!o.draft && !o.mmproj, specErr, vision: !!o.mmproj };
     } catch (e) { lastErr = e; if (o.draft) specErr = String(e.message || e).slice(0, 300); }
   }
   send('engine:status', { stage: 'error' });
@@ -432,8 +504,14 @@ ipcMain.handle('api:ping', async (_e, a) => {
 });
 // Anthropic native stream -> OpenAI-style SSE, so the UI parser stays the same
 async function anthropicChat(id, url, key, body, ctl) {
-  const sys = body.messages.filter(m => m.role === 'system').map(m => m.content).join('\n\n');
-  const msgs = []; for (const m of body.messages.filter(m => m.role !== 'system')) { const l = msgs[msgs.length - 1]; if (l && l.role === m.role) l.content += '\n\n' + m.content; else msgs.push({ role: m.role, content: m.content }); }
+  const txt = c => Array.isArray(c) ? c.filter(x => x.type === 'text').map(x => x.text).join('\n') : String(c || '');
+  const parts = c => !Array.isArray(c) ? [{ type: 'text', text: String(c || '') }] : c.map(x => {
+    if (x.type !== 'image_url') return { type: 'text', text: x.text || '' };
+    const m = String(x.image_url && x.image_url.url || '').match(/^data:([^;]+);base64,(.*)$/);
+    return m ? { type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } } : { type: 'image', source: { type: 'url', url: x.image_url.url } };
+  });
+  const sys = body.messages.filter(m => m.role === 'system').map(m => txt(m.content)).join('\n\n');
+  const msgs = []; for (const m of body.messages.filter(m => m.role !== 'system')) { const l = msgs[msgs.length - 1]; if (l && l.role === m.role) l.content.push(...parts(m.content)); else msgs.push({ role: m.role, content: parts(m.content) }); }
   while (msgs.length && msgs[0].role !== 'user') msgs.shift();
   const r = await fetch(url.replace(/\/$/, '') + '/messages', { method: 'POST', signal: ctl.signal, headers: apiHeaders({ kind: 'anthropic' }, key),
     body: JSON.stringify({ model: body.model, max_tokens: body.max_tokens || 8192, stream: true, system: sys || undefined, messages: msgs, temperature: body.temperature }) });
@@ -618,8 +696,8 @@ let autoUpdater = null;
 try { ({ autoUpdater } = require('electron-updater')); } catch {}
 app.whenReady().then(() => {
   if (!autoUpdater || !app.isPackaged) return;
-  autoUpdater.autoDownload = true; autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.on('update-available', i => send('update', { state: 'downloading', version: i.version, percent: 0 }));
+  autoUpdater.autoDownload = false; autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on('update-available', i => { if (i.version === readBoot().blocked) return; send('update', { state: 'downloading', version: i.version, percent: 0 }); autoUpdater.downloadUpdate().catch(() => {}); });
   autoUpdater.on('download-progress', p => send('update', { state: 'downloading', percent: Math.round(p.percent), got: p.transferred, total: p.total, speed: p.bytesPerSecond }));
   autoUpdater.on('update-downloaded', i => send('update', { state: 'ready', version: i.version }));
   autoUpdater.on('error', e => { try { fs.appendFileSync(path.join(DATA(), 'app.log'), `[update] ${e.message}\n`); } catch {} });
@@ -631,7 +709,7 @@ ipcMain.handle('update:check', async () => {
   try {
     const r = await Promise.race([autoUpdater.checkForUpdates(), new Promise(res => setTimeout(() => res(null), 8000))]);
     const v = r && r.updateInfo && r.updateInfo.version;
-    const newer = v && v.localeCompare(app.getVersion(), undefined, { numeric: true }) > 0;
+    const newer = v && v !== readBoot().blocked && v.localeCompare(app.getVersion(), undefined, { numeric: true }) > 0;
     return { available: !!newer, version: v };
   } catch (e) { return { available: false, error: e.message }; }
 });
@@ -668,11 +746,82 @@ ipcMain.handle('run:kill', (_e, id) => { const p = procs[id]; if (p) { try { p.k
 app.on('before-quit', () => { for (const p of Object.values(procs)) { try { p.kill(); } catch {} } });
 
 
+// ---------- photos for websites: Openverse (free, no key) or Pexels (user's free key) ----------
+const PHOTO_API = () => process.env.PULSAR_TEST_PHOTOS || null;
+ipcMain.handle('photos:find', async (_e, { q, n, key }) => {
+  const out = [];
+  try {
+    if (key) {
+      const r = await fetch((PHOTO_API() || 'https://api.pexels.com/v1') + `/search?per_page=${n || 3}&orientation=landscape&query=` + encodeURIComponent(q), { headers: { Authorization: key }, signal: AbortSignal.timeout(15000) });
+      if (r.ok) for (const p of (await r.json()).photos || []) out.push({ url: p.src.large2x || p.src.large, by: p.photographer, src: 'Pexels', link: p.url });
+    }
+    if (!out.length) {
+      const r = await fetch((PHOTO_API() || 'https://api.openverse.org/v1') + `/images/?page_size=${(n || 3) * 2}&license_type=commercial&aspect_ratio=wide&mature=false&q=` + encodeURIComponent(q), { headers: { 'User-Agent': 'PULSAR' }, signal: AbortSignal.timeout(15000) });
+      if (r.ok) for (const p of (await r.json()).results || []) if (p.url && /\.(jpe?g|png|webp)(\?|$)/i.test(p.url) || p.thumbnail) out.push({ url: p.url, thumb: p.thumbnail, by: p.creator || '', src: 'Openverse', license: (p.license || '').toUpperCase(), link: p.foreign_landing_url });
+    }
+  } catch (e) { return { ok: false, error: String(e.message || e) }; }
+  return { ok: true, photos: out.slice(0, n || 3) };
+});
+// download a picture straight into the workspace (only after the user allowed saving)
+ipcMain.handle('ws:download', async (_e, { url, rel, alt }) => {
+  const dest = wsPath(rel); fs.mkdirSync(path.dirname(dest), { recursive: true });
+  for (const u of [url, alt].filter(Boolean)) {
+    try {
+      const r = await fetch(u, { headers: { 'User-Agent': 'PULSAR' }, signal: AbortSignal.timeout(30000) });
+      if (!r.ok || !/^image\//.test(r.headers.get('content-type') || 'image/')) continue;
+      const b = Buffer.from(await r.arrayBuffer()); if (b.length < 2000 || b.length > 8 * 1048576) continue;
+      fs.writeFileSync(dest, b); return { ok: true };
+    } catch {}
+  }
+  return { ok: false };
+});
+
+// ---------- voice: whisper.cpp + ggml-small, downloaded on first use ----------
+const VOICE = () => path.join(DATA(), 'voice');
+function whisperExe() {
+  const bundled = path.join(process.resourcesPath || '', 'engine', 'whisper'), dev = path.join(__dirname, 'engine', 'whisper');
+  for (const d of [bundled, dev, VOICE()]) { if (!fs.existsSync(d)) continue; const f = findFile(d, 'whisper-cli.exe') || findFile(d, 'main.exe'); if (f) return f; }
+  return null;
+}
+ipcMain.handle('voice:status', () => ({ exe: !!whisperExe(), model: fs.existsSync(path.join(VOICE(), 'ggml-small.bin')) }));
+ipcMain.handle('voice:setup', async () => {
+  try {
+    fs.mkdirSync(VOICE(), { recursive: true });
+    if (!whisperExe()) {
+      const rel = await (await fetch('https://api.github.com/repos/ggml-org/whisper.cpp/releases/latest', { headers: { 'User-Agent': 'PULSAR' } })).json();
+      const a = (rel.assets || []).find(x => /^whisper-bin-x64\.zip$/i.test(x.name)) || (rel.assets || []).find(x => /bin-x64\.zip$/i.test(x.name) && !/cublas|cuda/i.test(x.name));
+      if (!a) throw new Error('whisper build not found');
+      const zip = path.join(VOICE(), 'w.zip');
+      await download(a.browser_download_url, zip, (g, t) => send('voice:progress', { part: 'bin', got: g, total: t }));
+      await unzip(zip, VOICE()); try { fs.unlinkSync(zip); } catch {}
+      if (!whisperExe()) throw new Error('whisper-cli.exe not found');
+    }
+    const m = path.join(VOICE(), 'ggml-small.bin');
+    if (!fs.existsSync(m)) await download('https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin', m, (g, t) => send('voice:progress', { part: 'model', got: g, total: t }));
+    return { ok: true };
+  } catch (e) { return { ok: false, error: String(e.message || e) }; }
+});
+ipcMain.handle('voice:transcribe', async (_e, { wav, lang }) => {
+  const exe = whisperExe(), model = path.join(VOICE(), 'ggml-small.bin');
+  if (!exe || !fs.existsSync(model)) return { ok: false, error: 'not installed' };
+  const f = path.join(app.getPath('temp'), `pulsar-voice-${Date.now()}.wav`);
+  fs.writeFileSync(f, Buffer.from(wav));
+  try {
+    const threads = String(Math.max(2, Math.min(8, require('os').cpus().length - 2)));
+    const out = await new Promise((res, rej) => execFile(exe, ['-m', model, '-f', f, '-l', lang || 'auto', '-nt', '-np', '-t', threads], { windowsHide: true, timeout: 120000, maxBuffer: 4 << 20, cwd: path.dirname(exe) },
+      (e, so, se) => e ? rej(new Error((se || e.message).slice(-300))) : res(so)));
+    return { ok: true, text: String(out).replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim() };
+  } catch (e) { return { ok: false, error: String(e.message || e) }; }
+  finally { try { fs.unlinkSync(f); } catch {} }
+});
+
 // ---------- attach files: read text from txt/code/csv/json/pdf/docx ----------
 const TEXT_EXT = /\.(txt|md|csv|tsv|json|js|mjs|ts|py|html?|css|xml|yml|yaml|log|ini|bat|ps1|sql|java|c|cpp|h|cs|go|rs|php|rb|kt|swift|sh)$/i;
 async function readAny(p) {
   const name = path.basename(p); const st = fs.statSync(p);
   if (st.size > 25 * 1048576) throw new Error('file is larger than 25 MB');
+  const im = (p.match(/\.(png|jpe?g|webp|gif|bmp)$/i) || [])[1];
+  if (im) { if (st.size > 12 * 1048576) throw new Error('picture is larger than 12 MB'); return { name, size: st.size, image: `data:image/${im.toLowerCase().replace('jpg', 'jpeg')};base64,` + fs.readFileSync(p).toString('base64') }; }
   let text = '';
   if (/\.pdf$/i.test(p)) { const { PDFParse } = require('pdf-parse'); const parser = new PDFParse({ data: fs.readFileSync(p) }); text = (await parser.getText()).text; await parser.destroy?.(); }
   else if (/\.docx$/i.test(p)) { text = (await require('mammoth').extractRawText({ path: p })).value; }
@@ -681,7 +830,7 @@ async function readAny(p) {
   return { name, size: st.size, text: text.slice(0, 60000), cut: text.length > 60000 };
 }
 ipcMain.handle('file:pick', async () => {
-  const r = await dialog.showOpenDialog(win, { properties: ['openFile', 'multiSelections'], filters: [{ name: 'Documents', extensions: ['txt', 'md', 'csv', 'json', 'pdf', 'docx', 'html', 'css', 'js', 'py', 'xml', 'log', 'ts', 'sql'] }, { name: 'All', extensions: ['*'] }] });
+  const r = await dialog.showOpenDialog(win, { properties: ['openFile', 'multiSelections'], filters: [{ name: 'Files', extensions: ['txt', 'md', 'csv', 'json', 'pdf', 'docx', 'html', 'css', 'js', 'py', 'xml', 'log', 'ts', 'sql', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }, { name: 'All', extensions: ['*'] }] });
   if (r.canceled) return [];
   const out = []; for (const p of r.filePaths.slice(0, 6)) { try { out.push(await readAny(p)); } catch (e) { out.push({ name: path.basename(p), error: e.message }); } }
   return out;
