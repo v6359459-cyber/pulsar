@@ -355,12 +355,111 @@ ipcMain.handle('ws:console', (_e, rel) => {
 
 // ---------- chat proxy (no CORS limits for cloud APIs) ----------
 const chats = {};
-ipcMain.on('chat:start', async (_e, { id, url, key, body }) => {
+// ---------- cloud APIs: any OpenAI-compatible provider, Gemini (compat endpoint) and Anthropic (native) ----------
+const PROVIDERS = [
+  { re: /^sk-or-/, name: 'OpenRouter', url: 'https://openrouter.ai/api/v1' },
+  { re: /^sk-ant-/, name: 'Anthropic', url: 'https://api.anthropic.com/v1', kind: 'anthropic' },
+  { re: /^gsk_/, name: 'Groq', url: 'https://api.groq.com/openai/v1' },
+  { re: /^AIza/, name: 'Google Gemini', url: 'https://generativelanguage.googleapis.com/v1beta/openai' },
+  { re: /^xai-/, name: 'xAI Grok', url: 'https://api.x.ai/v1' },
+  { re: /^nvapi-/, name: 'NVIDIA', url: 'https://integrate.api.nvidia.com/v1' },
+  { re: /^hf_/, name: 'Hugging Face', url: 'https://router.huggingface.co/v1' },
+  { re: /^csk-/, name: 'Cerebras', url: 'https://api.cerebras.ai/v1' },
+  { re: /^fw_/, name: 'Fireworks', url: 'https://api.fireworks.ai/inference/v1' },
+  { re: /^pplx-/, name: 'Perplexity', url: 'https://api.perplexity.ai' },
+  { re: /^sk-proj-|^sk-svcacct-/, name: 'OpenAI', url: 'https://api.openai.com/v1' }
+];
+// keys without a clear prefix are tried against these one by one
+const GUESS = [
+  { name: 'OpenAI', url: 'https://api.openai.com/v1' }, { name: 'DeepSeek', url: 'https://api.deepseek.com/v1' },
+  { name: 'Moonshot (Kimi)', url: 'https://api.moonshot.ai/v1' }, { name: 'Mistral', url: 'https://api.mistral.ai/v1' },
+  { name: 'Together', url: 'https://api.together.xyz/v1' }, { name: 'SambaNova', url: 'https://api.sambanova.ai/v1' },
+  { name: 'Qwen (DashScope)', url: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1' }, { name: 'Zhipu GLM', url: 'https://api.z.ai/api/paas/v4' }
+];
+const apiHeaders = (p, key) => p.kind === 'anthropic'
+  ? { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' }
+  : { ...(key ? { Authorization: 'Bearer ' + key } : {}), 'Content-Type': 'application/json', 'HTTP-Referer': 'https://github.com/v6359459-cyber/pulsar', 'X-Title': 'PULSAR' };
+function apiError(status, text) {
+  const t = String(text || '').slice(0, 300);
+  if (status === 401) return 'Ключ неверный или отозван (401)';
+  if (status === 402) return 'На счету API нет денег (402)';
+  if (status === 403) return 'Нет доступа: ключ не подходит или регион заблокирован (403)';
+  if (status === 404) return 'Адрес API не найден (404) — проверь ссылку';
+  if (status === 429) return 'Лимит запросов или квота закончилась (429)';
+  if (status >= 500) return `Сервер API сейчас не работает (${status})`;
+  return `Ошибка ${status}: ${t}`;
+}
+async function listModels(p, key) {
+  const r = await fetch(p.url.replace(/\/$/, '') + '/models' + (p.kind === 'anthropic' ? '?limit=100' : ''), { headers: apiHeaders(p, key), signal: AbortSignal.timeout(15000) });
+  if (!r.ok) { const e = new Error(apiError(r.status, await r.text().catch(() => ''))); e.status = r.status; throw e; }
+  const j = await r.json(); const arr = Array.isArray(j) ? j : j.data || j.models || [];
+  return arr.map(m => {
+    const id = String(m.id || m.name || '').replace(/^models\//, ''); if (!id) return null;
+    const pr = m.pricing || {}; const free = /:free$/.test(id) || (pr.prompt === '0' && pr.completion === '0');
+    return { id, name: m.display_name || m.name && m.name !== m.id ? (m.display_name || m.name) : id, free, ctx: m.context_length || m.context_window || null };
+  }).filter(Boolean).filter(m => !/embed|whisper|tts|dall-e|image|audio|moderation|rerank|transcribe|realtime|guard/i.test(m.id));
+}
+ipcMain.handle('api:check', async (_e, { key, url }) => {
+  key = String(key || '').trim(); url = String(url || '').trim().replace(/\/(chat\/completions|models)\/?$/, '').replace(/\/$/, '');
+  if (!key && !url) return { ok: false, error: 'Вставь ключ API' };
+  if (/\s/.test(key)) return { ok: false, error: 'В ключе есть пробелы или переносы строк — скопируй его заново' };
+  let cands;
+  if (url) { const known = PROVIDERS.find(p => url.startsWith(p.url)); cands = [{ name: known ? known.name : (url.match(/\/\/([^/]+)/) || [])[1] || 'API', url, kind: /anthropic\.com/.test(url) ? 'anthropic' : undefined }]; }
+  else { const p = PROVIDERS.find(p => p.re.test(key)); cands = p ? [p] : GUESS; }
+  let last = 'Не удалось определить, от какого сервиса этот ключ. Укажи адрес API вручную.', authErr = null;
+  for (const p of cands) {
+    try {
+      const models = await listModels(p, key);
+      if (!models.length) { last = 'Ключ работает, но у него нет доступных моделей'; continue; }
+      models.sort((a, b) => (b.free - a.free) || a.id.localeCompare(b.id));
+      return { ok: true, provider: p.name, url: p.url, kind: p.kind || 'openai', models };
+    } catch (e) {
+      if (e.name === 'TimeoutError' || /fetch failed|ENOTFOUND|ECONN/i.test(String(e.message) + String(e.cause))) { last = cands.length === 1 ? 'Нет связи с сервером API — проверь интернет или адрес' : last; continue; }
+      if (cands.length === 1 || e.status !== 401) authErr = authErr || e.message; 
+    }
+  }
+  return { ok: false, error: authErr || last };
+});
+// a tiny real request, so "connected" means the model really answers
+ipcMain.handle('api:ping', async (_e, a) => {
+  try {
+    const p = { url: a.url, kind: a.kind };
+    const body = a.kind === 'anthropic' ? { model: a.model, max_tokens: 5, messages: [{ role: 'user', content: 'Hi' }] } : { model: a.model, max_tokens: 5, messages: [{ role: 'user', content: 'Hi' }] };
+    const r = await fetch(a.url.replace(/\/$/, '') + (a.kind === 'anthropic' ? '/messages' : '/chat/completions'), { method: 'POST', headers: apiHeaders(p, a.key), body: JSON.stringify(body), signal: AbortSignal.timeout(45000) });
+    if (!r.ok) return { ok: false, error: apiError(r.status, await r.text().catch(() => '')) + ' · ' + a.model };
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.name === 'TimeoutError' ? 'Модель не ответила за 45 секунд' : 'Нет связи с сервером API' }; }
+});
+// Anthropic native stream -> OpenAI-style SSE, so the UI parser stays the same
+async function anthropicChat(id, url, key, body, ctl) {
+  const sys = body.messages.filter(m => m.role === 'system').map(m => m.content).join('\n\n');
+  const msgs = []; for (const m of body.messages.filter(m => m.role !== 'system')) { const l = msgs[msgs.length - 1]; if (l && l.role === m.role) l.content += '\n\n' + m.content; else msgs.push({ role: m.role, content: m.content }); }
+  while (msgs.length && msgs[0].role !== 'user') msgs.shift();
+  const r = await fetch(url.replace(/\/$/, '') + '/messages', { method: 'POST', signal: ctl.signal, headers: apiHeaders({ kind: 'anthropic' }, key),
+    body: JSON.stringify({ model: body.model, max_tokens: body.max_tokens || 8192, stream: true, system: sys || undefined, messages: msgs, temperature: body.temperature }) });
+  if (!r.ok) { send('chat:end', { id, error: apiError(r.status, await r.text()) }); return; }
+  const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+  const out = o => send('chat:chunk', { id, data: 'data: ' + JSON.stringify(o) + '\n\n' });
+  for (;;) {
+    const { done, value } = await rd.read(); if (done) break;
+    buf += dec.decode(value, { stream: true }); const lines = buf.split('\n'); buf = lines.pop();
+    for (const ln of lines) {
+      if (!ln.startsWith('data:')) continue; let j; try { j = JSON.parse(ln.slice(5)); } catch { continue; }
+      if (j.type === 'content_block_delta' && j.delta) { if (j.delta.type === 'text_delta') out({ choices: [{ delta: { content: j.delta.text } }] }); else if (j.delta.type === 'thinking_delta') out({ choices: [{ delta: { reasoning_content: j.delta.thinking } }] }); }
+      else if (j.type === 'message_delta' && j.delta && j.delta.stop_reason) out({ choices: [{ delta: {}, finish_reason: j.delta.stop_reason === 'max_tokens' ? 'length' : 'stop' }] });
+      else if (j.type === 'error') { send('chat:end', { id, error: (j.error && j.error.message) || 'error' }); return; }
+    }
+  }
+  send('chat:end', { id });
+}
+ipcMain.on('chat:start', async (_e, { id, url, key, body, kind }) => {
   const ctl = new AbortController(); chats[id] = ctl;
   try {
+    if (kind === 'anthropic') { await anthropicChat(id, url, key, body, ctl); return; }
+    const local = /127\.0\.0\.1|localhost/.test(url);
     const r = await fetch(url, { method: 'POST', signal: ctl.signal,
-      headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: 'Bearer ' + key } : {}) }, body: JSON.stringify(body) });
-    if (!r.ok) { send('chat:end', { id, error: 'HTTP ' + r.status + ' ' + (await r.text()).slice(0, 300) }); return; }
+      headers: local ? { 'Content-Type': 'application/json' } : apiHeaders({}, key), body: JSON.stringify(body) });
+    if (!r.ok) { const t = await r.text(); send('chat:end', { id, error: local ? 'HTTP ' + r.status + ' ' + t.slice(0, 300) : apiError(r.status, t) }); return; }
     const rd = r.body.getReader(), dec = new TextDecoder();
     for (;;) { const { done, value } = await rd.read(); if (done) break; send('chat:chunk', { id, data: dec.decode(value, { stream: true }) }); }
     send('chat:end', { id });

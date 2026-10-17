@@ -18,7 +18,8 @@ contextBridge.exposeInMainWorld('pulsar', {
     read: r => ipcRenderer.invoke('ws:read', r), list: r => ipcRenderer.invoke('ws:list', r), move: (from, to) => ipcRenderer.invoke('ws:move', { from, to }), mkdir: r => ipcRenderer.invoke('ws:mkdir', r), run: r => ipcRenderer.invoke('ws:run', r),
     console: r => ipcRenderer.invoke('ws:console', r), saveAs: (name, content) => ipcRenderer.invoke('ws:saveAs', { name, content })
   },
-  chat: (id, url, key, body) => ipcRenderer.send('chat:start', { id, url, key, body }),
+  chat: (id, url, key, body, kind) => ipcRenderer.send('chat:start', { id, url, key, body, kind }),
+  apiCheck: (key, url) => ipcRenderer.invoke('api:check', { key, url }), apiPing: a => ipcRenderer.invoke('api:ping', a),
   chatAbort: id => ipcRenderer.send('chat:abort', id),
   onChunk: on('chat:chunk'),
   onChatEnd: on('chat:end'),

@@ -231,7 +231,7 @@ async function appScreen() {
   P.monitor(S.st.load !== false);
 }
 function renderNav() {
-  const tabs = [['chat', 'tChat'], ['projects', 'tProjects'], ['models', 'tModels'], ['opt', 'tOpt'], ['agents', 'tAgents']];
+  const tabs = [['chat', 'tChat'], ['projects', 'tProjects'], ['models', 'tModels'], ['api', 'tApi'], ['opt', 'tOpt'], ['agents', 'tAgents']];
   const hw = S.st.hw || {}; const [pname] = profile();
   const sp = S.running && S.st.speed && S.st.speed[S.running];
   $('#nav').innerHTML = `<div class="brand"><div class="dot led"></div>PULSAR</div>
@@ -477,20 +477,35 @@ function viewAgents() {
 
 // ---------- custom APIs ----------
 function viewApi() {
-  const apis = S.st.apis || [];
-  return `<h2 class="fu">${T('tApi')}</h2><p class="sub fu" style="animation-delay:.08s">${T('apiSub')}</p>
-  <div class="fu" style="animation-delay:.15s;max-width:560px;display:flex;flex-direction:column;gap:16px">
-    <label class="field">${T('apiName')}<input id="aName" placeholder="Groq"></label>
-    <label class="field">${T('apiUrl')}<input id="aUrl" class="mono" placeholder="https://api.groq.com/openai/v1"></label>
-    <label class="field">${T('apiKey')}<input id="aKey" type="password" class="mono" placeholder="sk-…"></label>
-    <label class="field">${T('apiModel')}<input id="aModel" class="mono" placeholder="llama-3.3-70b-versatile"></label>
-    <button class="btn" style="align-self:flex-start" data-act="apiAdd">${T('apiAdd')}</button>
-    ${apis.length ? `<div style="margin-top:20px" class="small muted">${T('apiList')}</div>${apis.map((a, i) => `<div class="row card" style="flex-direction:row;padding:16px 20px"><span>${esc(a.name)} <span class="mono small muted">${esc(a.model)}</span></span><button class="btn ghost sm" data-act="apiDel" data-v="${i}">${T('del')}</button></div>`).join('')}` : ''}
+  const apis = S.st.apis || [], c = S.apiCheck || {};
+  const status = c.state === 'work' ? `<div class="apist"><span class="dot led"></span><span class="shimmer">${T('apiChecking')}</span></div>`
+    : c.state === 'err' ? `<div class="apist err">${ico('x', 13)}<span>${esc(c.error)}</span></div>`
+    : c.state === 'ok' ? `<div class="apist ok">${ico('check', 13)}<span>${T('apiKeyOk')(c.provider, c.models.length)}</span></div>` : '';
+  const pick = c.state === 'ok' ? `<div class="apipick fu"><input id="aQ" class="mono" placeholder="${T('apiSearch')}" value="${esc(c.q || '')}" autocomplete="off"><div id="aList" class="alist">${apiModelList()}</div></div>` : '';
+  return `<h2 class="fu">API</h2><p class="sub fu" style="animation-delay:.08s">${T('apiSub2')}</p>
+  <div class="fu" style="animation-delay:.14s;max-width:640px;display:flex;flex-direction:column;gap:14px">
+    <label class="field">${T('apiKey')}<input id="aKey" type="password" class="mono" placeholder="sk-… · gsk_… · AIza… · sk-ant-… · sk-or-…" value="${esc(c.key || '')}" autocomplete="off"></label>
+    <label class="field">${T('apiUrlOpt')}<input id="aUrl" class="mono" placeholder="https://… /v1" value="${esc(c.url0 || '')}" autocomplete="off"></label>
+    <div class="row" style="justify-content:flex-start;gap:10px"><button class="btn" data-act="apiCheck" ${c.state === 'work' ? 'disabled' : ''}>${T('apiCheckBtn')}</button></div>
+    ${status}${pick}
+    <div class="sec" style="margin-top:26px">${T('apiConnected')} · ${apis.length}</div>
+    ${apis.length ? apis.map((a, i) => `<div class="card apicard fu" style="animation-delay:${.05 * i}s">
+      <div class="row"><span style="display:flex;flex-direction:column;gap:4px"><span style="font-size:18px;font-weight:400">${esc(a.name)}</span><span class="mono small muted">${esc(a.model)} · ••••${esc((a.key || '').slice(-4))}</span></span>
+      <span style="display:flex;align-items:center;gap:12px"><span class="mono small apiok">● ${a.err ? esc(a.err) : T('apiOn')}</span><button class="btn ghost sm" data-act="apiDel" data-v="${i}">${T('del')}</button></span></div></div>`).join('')
+      : `<div class="muted small">${T('apiNone')}</div>`}
     <label class="field" style="margin-top:28px">${T('searchKey')}<input id="sKey" type="password" class="mono" value="${esc(S.st.searchKey || '')}"></label>
     <button class="btn ghost sm" style="align-self:flex-start" data-act="sKey">${T('save')}</button>
   </div>`;
 }
-
+function apiModelList() {
+  const c = S.apiCheck; if (!c || !c.models) return '';
+  const q = (c.q || '').toLowerCase().trim();
+  const l = c.models.filter(m => !q || m.id.toLowerCase().includes(q) || String(m.name).toLowerCase().includes(q)).slice(0, 80);
+  const have = new Set((S.st.apis || []).filter(a => a.url === c.url && a.key === c.key).map(a => a.model));
+  return l.length ? l.map(m => `<button class="arow ${have.has(m.id) ? 'on' : ''}" data-act="apiPick" data-v="${esc(m.id)}" ${c.pinging ? 'disabled' : ''}>
+      <span class="mono">${esc(m.id)}</span><span class="small muted">${c.pinging === m.id ? `<span class="shimmer">${T('apiPinging')}</span>` : have.has(m.id) ? T('apiOn') : m.free ? T('apiFree') : ''}</span></button>`).join('')
+    : `<div class="muted small" style="padding:12px">${T('apiNoMatch')}</div>`;
+}
 // ---------- projects ----------
 async function loadProjects() {
   let list = []; try { list = await P.ws.list('.'); } catch (e) {}
@@ -516,8 +531,11 @@ async function rememberProject(dir, files, title) {
 
 // ---------- chat ----------
 function sources() {
-  const out = [];
-  if (S.running) { const m = allModels().find(x => x.id === S.running); out.push(['local', m ? m.name : S.running]); }
+  const out = [], apis = S.st.apis || [];
+  const lm = S.running && allModels().find(x => x.id === S.running);
+  if (S.running) out.push(['local', `${T('srcPc')} · ${lm ? lm.name : S.running}`]);
+  apis.forEach((a, i) => out.push(['api:' + i, `API · ${a.name} · ${a.model}`]));
+  if (S.running) apis.forEach((a, i) => out.push(['tog:' + i, `${T('srcTog')} · ${lm ? lm.name : 'ПК'} + ${a.model}`]));
   return out;
 }
 const ICON = {
@@ -600,6 +618,7 @@ const statusHTML = txt => `<div class="status"><span class="dot led"></span><spa
 
 function viewChat() {
   const src = sources();
+  if (!S.sel && S.st.sel) S.sel = S.st.sel;
   if (!S.sel || !src.find(s => s[0] === S.sel)) S.sel = src[0] ? src[0][0] : null;
   const cur = S.st.agent || 'coder';
   const opts = `${ourAgents().map(a => `<option value="${a[0]}" ${cur === a[0] ? 'selected' : ''}>${a[1]}</option>`).join('')}`;
@@ -650,14 +669,16 @@ const chainRest = m => (m.content ? `<div style="margin-top:14px">${md(m.content
 function msgInner(m) {
   if (m.chain) return chainHTML(m) + `<div class="mrest">${chainRest(m)}</div>`;
   const extra = (m.extra || []).map(a => actLine(a.kind, a.arg, a)).join('');
-  const ctx = { acts: m.actions, k: 0, only: m.parts ? ['file', 'run'] : null };
+  let ctx = { acts: m.actions, k: 0, only: m.parts ? ['file', 'run'] : null };
   if (!m.parts) return (m.agent ? `<div class="alabel">${esc(m.agent)}</div>` : '') + (m.content ? md(stripMem(m.content), ctx) : '') + (m.memNote ? `<div class="memnote">${ico('check', 12)}<span>${esc(m.memNote)}</span></div>` : '') + extra + askHTML(m.ask) + (m.live ? statusHTML(m.status || liveStatus(m.content)) : '');
-  const st = { wait: T('waiting'), work: T('working'), done: T('done') };
+  const st = { wait: T('waiting'), work: T('working'), done: T('done'), error: T('sError') };
+  if (m.debate) ctx = { acts: m.actions, k: 0 };
+  const pctx = m.debate ? null : ctx;
   const head = m.stage === 'plan' ? statusHTML(T('planning')) : '';
   const steps = m.parts.map(p => `<div class="step"><div class="row"><span style="font-size:15px;font-weight:400">${p.status === 'work' ? '<span class="dot led" style="display:inline-block;margin-right:8px"></span>' : ''}${esc(p.name)}</span>
     <span class="mono small muted">${p.status === 'work' ? '<span class="shimmer">' + liveStatus(p.content) + '</span>' : st[p.status]}</span></div><div class="small muted" style="margin-top:4px">${esc(p.task)}</div>
-    ${p.content ? `<details ${p.status === 'work' ? 'open' : ''}><summary>···</summary><div class="body">${md(p.content, ctx)}</div></details>` : ''}</div>`).join('');
-  const fin = m.stage === 'merge' && !m.content ? statusHTML(T('merging')) : m.content ? `<div style="margin-top:14px">${md(m.content)}</div>` : '';
+    ${p.content ? `<details ${p.status === 'work' ? 'open' : ''}><summary>···</summary><div class="body">${md(p.content, pctx)}</div></details>` : ''}</div>`).join('');
+  const fin = m.stage === 'merge' && !m.content ? statusHTML(m.debate ? T('dbMerge') : T('merging')) : m.content ? `<div style="margin-top:14px">${md(m.debate ? stripMem(m.content) : m.content, m.debate ? ctx : undefined)}</div>` : '';
   return head + steps + fin + extra + askHTML(m.ask);
 }
 function msgHTML(m, i) {
@@ -722,15 +743,19 @@ function paintNow(i) {
 function setSendBtn() { const b = root.querySelector('.send'); if (!b) return; b.dataset.act = S.streaming ? 'stop' : 'send'; b.innerHTML = sendIcon(); }
 
 // --- model transport (through main process) ---
-function target() {
-  return { base: 'http://127.0.0.1:18089/v1', key: '', model: 'local' };
-}
+const LOCAL_T = { base: 'http://127.0.0.1:18089/v1', key: '', model: 'local', kind: 'local', local: true };
+const isTog = sel => /^tog:/.test(sel || ''), isApi = sel => /^api:/.test(sel || '');
+function apiT(i) { const a = (S.st.apis || [])[+i]; return a ? { base: a.url, key: a.key, model: a.model, kind: a.kind || 'openai', name: a.name } : null; }
+// "together" answers through the API by default; the local model joins in debate() and in builds
+function target(sel) { sel = sel || S.sel; if (isApi(sel) || isTog(sel)) return apiT(sel.split(':')[1]) || LOCAL_T; return LOCAL_T; }
+const haveModel = () => !!S.running || isApi(S.sel) || (isTog(S.sel) && !!S.running);
+const onlyCloud = () => isApi(S.sel);
 const live = {};
 P.onChunk(({ id, data }) => live[id] && live[id].chunk(data));
 P.onChatEnd(({ id, error }) => live[id] && live[id].end(error));
 let reqSeq = 0;
 function stream(messages, signal, onDelta, extra, meta) {
-  const t = target(); const id = 'r' + (++reqSeq);
+  const t = (meta && meta.tgt) || target(); const id = 'r' + (++reqSeq);
   return new Promise((resolve, reject) => {
     let buf = '', all = '', thinking = false, looped = false, checked = 0;
     const emit = c => {
@@ -760,7 +785,7 @@ function stream(messages, signal, onDelta, extra, meta) {
       }
     };
     S.lastFinish = null;
-    P.chat(id, t.base + '/chat/completions', t.key, { model: t.model, stream: true, messages, temperature: 0.4, repeat_penalty: 1.08, repeat_last_n: 256, ...(extra || {}) });
+    P.chat(id, t.base.replace(/\/$/, '') + '/chat/completions', t.key, { model: t.model, stream: true, messages, temperature: 0.4, ...(t.local ? { repeat_penalty: 1.08, repeat_last_n: 256 } : {}), ...(extra || {}) }, t.kind);
   });
 }
 // the model got stuck: the same piece (40+ chars) repeats 4 times in a row at the end -> how much to cut
@@ -1170,17 +1195,48 @@ function askHTML(a) {
 function cool(signal) {
   return new Promise(res => { const t0 = Date.now(); const tick = () => { if (!S.temps?.hot || signal?.aborted || Date.now() - t0 > 120000) return res(); setTimeout(tick, 2000); }; tick(); });
 }
+// local model and API answer in parallel, criticize each other, the API writes the best final answer
+async function debate(msg, idx, messages, userText, signal) {
+  const api = target(), lm = findM(S.running);
+  const lang = L() === 'ru' ? 'Russian' : 'English';
+  msg.debate = true; msg.live = false;
+  const a = { name: `${T('srcPc')} · ${lm ? lm.name : 'local'}`, task: T('dbAnswer'), status: 'work', content: '', t: LOCAL_T };
+  const b = { name: `API · ${api.model}`, task: T('dbAnswer'), status: 'work', content: '', t: api };
+  msg.parts = [a, b]; paint(idx);
+  const run = async (p, msgs, extra) => { try { const meta = { tgt: p.t }; await stream(msgs, signal, c => { p.content += c; paint(idx); }, extra, meta); p.status = 'done'; } catch (e) { if (e.name === 'AbortError') throw e; p.status = 'error'; p.content += '\n⚠ ' + (e.message || e); } paint(idx); };
+  await Promise.all([run(a, messages), run(b, messages)]);
+  const ans = p => noThink(p.content).trim();
+  const ok = [a, b].filter(p => p.status === 'done' && ans(p));
+  if (ok.length < 2) { msg.content = ok.length ? ans(ok[0]) : T('dbFail'); msg.parts.forEach(p => p.status = p.status === 'work' ? 'done' : p.status); paint(idx); return; }
+  // each one criticizes the other
+  const ca = { name: a.name, task: T('dbCritique'), status: 'work', content: '', t: LOCAL_T }, cb = { name: b.name, task: T('dbCritique'), status: 'work', content: '', t: api };
+  msg.parts.push(ca, cb); paint(idx);
+  const crit = other => [{ role: 'system', content: `You are a strict reviewer. Find factual errors, bugs, missing parts and weak points in the other assistant's answer. Short list, max 8 points. If it is good, say what is best in it. Answer in ${lang}.` },
+    { role: 'user', content: `Request: ${userText.slice(0, 6000)}\n\nAnswer to review:\n${ans(other).slice(0, 12000)}` }];
+  await Promise.all([run(ca, crit(b), { temperature: 0.2 }), run(cb, crit(a), { temperature: 0.2 })]);
+  // the best final answer
+  msg.stage = 'merge'; paint(idx);
+  const sys = messages[0].content + `\nYou now write the FINAL answer. You get two answers to the same request (A — local model, B — cloud model) and their reviews of each other. Take the best and correct parts of both, fix every real problem the reviews found, and write one complete best answer for the user. Do not mention A, B, models, reviews or the debate. If the task needs action blocks, include them in full.`;
+  const meta = { tgt: api };
+  try {
+    await stream([{ role: 'system', content: sys }, { role: 'user', content: `Request: ${userText.slice(0, 8000)}\n\n=== Answer A ===\n${ans(a).slice(0, 14000)}\n\n=== Answer B ===\n${ans(b).slice(0, 14000)}\n\n=== Review of B by A ===\n${ans(ca).slice(0, 4000)}\n\n=== Review of A by B ===\n${ans(cb).slice(0, 4000)}` }],
+      signal, c => { msg.content += c; paint(idx); }, { temperature: 0.3 }, meta);
+  } catch (e) { if (e.name === 'AbortError') throw e; msg.content = ans(b) || ans(a); }
+  if (!noThink(msg.content).trim()) msg.content = ans(b) || ans(a);
+  msg.stage = 'done'; paint(idx);
+}
 async function runAgent(ag, userText, signal) {
   S.curAgentName = ag.name;
   const doneActs = new Set(), seen = {}; let lastSig = '';
   for (let round = 0; round < (ag.id === 'browser' ? 10 : 6); round++) {
-    if (S.temps?.hot) { const w = { role: 'assistant', content: '', live: true, status: T('cooling') }; S.msgs.push(w); const wi = S.msgs.length - 1; addMsg(wi); await cool(signal); S.msgs.splice(wi, 1); root.querySelector(`.msg[data-i="${wi}"]`)?.remove(); }
+    if (S.temps?.hot && !onlyCloud()) { const w = { role: 'assistant', content: '', live: true, status: T('cooling') }; S.msgs.push(w); const wi = S.msgs.length - 1; addMsg(wi); await cool(signal); S.msgs.splice(wi, 1); root.querySelector(`.msg[data-i="${wi}"]`)?.remove(); }
     if (round === 0 && ag.id === 'files') { let l = []; try { l = await P.ws.list('.'); } catch (e) {} S.msgs.push({ role: 'tool', content: `Workspace files (${l.length}):\n${l.join('\n') || '(empty)'}` }); addMsg(S.msgs.length - 1); }
     const history = toApi(S.msgs.slice(-24));
     const msg = { role: 'assistant', content: '', live: true, agent: round === 0 ? ag.name : null }; S.msgs.push(msg); const idx = S.msgs.length - 1; addMsg(idx);
     try {
       const meta = {};
-      await stream([sysMsg(ag.prompt, ag.tools, ag.id === 'chat'), ...(ag.tools ? fewshot() : []), ...history], signal, c => { msg.content += c; paint(idx); }, null, meta);
+      if (round === 0 && isTog(S.sel) && S.running) await debate(msg, idx, [sysMsg(ag.prompt, ag.tools, ag.id === 'chat'), ...(ag.tools ? fewshot() : []), ...history], userText, signal);
+      else await stream([sysMsg(ag.prompt, ag.tools, ag.id === 'chat'), ...(ag.tools ? fewshot() : []), ...history], signal, c => { msg.content += c; paint(idx); }, null, meta);
       if (meta.finish === 'loop') msg.content = msg.content.slice(0, msg.content.length - (meta.loopCut || 0));
       for (let k = 0; k < 4 && meta.finish === 'length'; k++) {
         msg.status = T('stContinue'); meta.finish = null;
@@ -1311,7 +1367,7 @@ async function runChain(text, signal, plan) {
   const stage = id => { let seen = false; for (const st of msg.chain.stages) { if (st.id === id) { st.state = 'work'; seen = true; } else if (!seen) st.state = 'done'; } paint(idx); };
   const finish = () => { msg.chain.stages.forEach(st => st.state = 'done'); paint(idx); };
   const part = (name, task, status) => { const p = { name, task, status: status || 'work', content: '' }; msg.parts.push(p); paint(idx); return p; };
-  const waitCool = async () => { if (!S.temps?.hot) return; msg.chain.cooling = true; paint(idx); await cool(signal); msg.chain.cooling = false; paint(idx); };
+  const waitCool = async () => { if (!S.temps?.hot || onlyCloud()) return; msg.chain.cooling = true; paint(idx); await cool(signal); msg.chain.cooling = false; paint(idx); };
   stage('accept'); await new Promise(r => setTimeout(r, 350));
   let brief = '';
   const browser = def('browser'), coder = def('coder');
@@ -1370,7 +1426,7 @@ async function runChain(text, signal, plan) {
   const nav = pages.map(x => `${x.file} (${x.title || ''})`).join(', ');
   stage('code');
   const jobs = pages.map((pg, k) => part(coder[1] + (pages.length > 1 ? ' #' + (k + 1) : ''), plan.site ? `${pg.file}${pg.title ? ' — ' + pg.title : ''}` : T('chCode'), 'wait'));
-  const slots = () => S.temps?.hot ? 1 : Math.max(1, S.slots || 1);
+  const slots = () => onlyCloud() ? 3 : S.temps?.hot ? 1 : Math.max(1, S.slots || 1);
   const codes = await limitAll(pages, slots(), async (pg, k) => {
     await waitCool();
     const p = jobs[k]; p.status = 'work'; paint(idx);
@@ -1379,6 +1435,17 @@ async function runChain(text, signal, plan) {
       : ' Output the complete program in one code block, then a short explanation of how to run it.') + ` Never say you cannot save or open files. Answer in ${lang}.`;
     const user = pg.code ? `Change request: ${text}\n\nCurrent code of ${pg.file} (keep everything that was not asked to change, return the whole updated file):\n\`\`\`${plan.site ? 'html' : ''}\n${pg.code.slice(0, 24000)}\n\`\`\`` : `Request: ${text}${pages.length > 1 ? `\n\nThis page: ${pg.file} — ${pg.title}. Content: ${pg.purpose}` : ''}${brief ? `\n\nDesign reference from the examples (recreate this style and structure with the user's own content):\n${brief.slice(0, 5000)}` : ''}`;
     const meta = {};
+    if (isTog(S.sel) && S.running) {
+      // the local model builds its own version in parallel; the version with fewer problems wins
+      p.name = 'API · ' + p.name;
+      const q = part(`${T('srcPc')} · ${coder[1]}${pages.length > 1 ? ' #' + (k + 1) : ''}`, p.task); const lm = {};
+      const mine = (async () => { try { await stream([{ role: 'system', content: sys }, { role: 'user', content: user }], signal, c => { q.content += c; paint(idx); }, { temperature: 0.3 }, { tgt: LOCAL_T }); } catch (e) { if (e.name === 'AbortError') throw e; } q.status = 'done'; paint(idx); })();
+      await Promise.all([mine, stream([{ role: 'system', content: sys }, { role: 'user', content: user }], signal, c => { p.content += c; paint(idx); }, { temperature: 0.3 }, meta).catch(e => { if (e.name === 'AbortError') throw e; })]);
+      p.status = 'done';
+      const A = extractCode(p.content, plan.site), Bc = extractCode(q.content, plan.site);
+      if (A && Bc) { const [pa, pb] = await Promise.all([autoCheck(A, plan.site), autoCheck(Bc, plan.site)]); const win = pb.length < pa.length || (pb.length === pa.length && Bc.code.length > A.code.length * 1.3) ? Bc : A; (win === A ? p : q).task += ' · ' + T('dbWin'); paint(idx); return win; }
+      paint(idx); return A || Bc;
+    }
     await stream([{ role: 'system', content: sys }, { role: 'user', content: user }], signal, c => { p.content += c; paint(idx); }, { temperature: 0.3 }, meta);
     if (meta.finish === 'loop') p.content = p.content.slice(0, p.content.length - (meta.loopCut || 0));
     for (let r = 0; r < 4 && meta.finish === 'length'; r++) {
@@ -1484,7 +1551,7 @@ async function sendMsg() {
   }
   const url = files.length ? null : openIntent(typed);
   if (url) S.lastLinks = [url];
-  if (!S.running && !url) { toast(T('chatNoModel')); return; }
+  if (!haveModel() && !url) { toast(T('chatNoModel')); return; }
   ta.value = ''; ta.style.height = 'auto';
   S.msgs.push({ role: 'user', content: text, shown: typed, files: files.map(f => ({ name: f.name, size: f.size })) }); addMsg(S.msgs.length - 1);
   const ctl = new AbortController(); S.streaming = ctl; setSendBtn(); lockComposer(true); Sound.soft();
@@ -1501,13 +1568,13 @@ async function sendMsg() {
   S.lastAgent = chain ? (plan.urls.length || plan.research ? 'PULSAR IN BROWSER → PULSAR CODE' : 'PULSAR CODE ×2') : ag.name; S.lastAgentId = chain ? 'coder' : ag.id;
   const pill = $('#apill'); if (pill && auto) { pill.textContent = S.lastAgent; pill.classList.remove('flash'); void pill.offsetWidth; pill.classList.add('flash'); }
   try {
-    if (chain && S.running) await runChain(text, ctl.signal, plan);
+    if (chain && haveModel()) await runChain(text, ctl.signal, plan);
     else if (url) {
       const m = { role: 'assistant', content: '', extra: [{ id: 'a' + (++actSeq), kind: 'open', arg: url, state: 'wait' }] };
       S.msgs.push(m); const i = S.msgs.length - 1; addMsg(i);
       const res = await execAction(m.extra[0], () => paint(i), true);
       const rest = text.replace(/(открой|открыть|зайди|перейди|open|go to)[^,.;]*/i, '').trim();
-      if (S.running && rest.split(/\s+/).length >= 3) { S.msgs.push({ role: 'tool', content: res }); addMsg(S.msgs.length - 1); await runAgent(ag, text, ctl.signal); }
+      if (haveModel() && rest.split(/\s+/).length >= 3) { S.msgs.push({ role: 'tool', content: res }); addMsg(S.msgs.length - 1); await runAgent(ag, text, ctl.signal); }
     } else {
       const pageTab = B.tabs.find(x => x.id === B.active && x.url !== START);
       if (ag.id === 'browser' && pageTab && PAGE_ACT_RE.test(text) && !SEARCH_RE.test(text)) {
@@ -1562,12 +1629,25 @@ root.addEventListener('click', async e => {
     case 'folder': P.openModels(); break;
     case 'autoAgentCard': await save({ autoAgent: S.st.autoAgent === false }); Sound.tick(1500); renderMain(); break;
     case 'agent': await save({ agent: v, autoAgent: false }); Sound.tick(1500); renderMain(); break;
-    case 'apiAdd': {
-      const a = { name: $('#aName').value.trim() || 'API', url: $('#aUrl').value.trim(), key: $('#aKey').value.trim(), model: $('#aModel').value.trim() };
-      if (!a.url || !a.model) return;
-      await save({ apis: [...(S.st.apis || []), a] }); Sound.done(); renderMain(); break;
+    case 'apiCheck': {
+      const key = $('#aKey').value.trim(), url0 = $('#aUrl').value.trim();
+      S.apiCheck = { state: 'work', key, url0 }; S._lastTab = 'api'; renderMain(); Sound.soft();
+      const r = await P.apiCheck(key, url0).catch(e => ({ ok: false, error: String(e.message || e) }));
+      S.apiCheck = r.ok ? { state: 'ok', key, url0, provider: r.provider, url: r.url, kind: r.kind, models: r.models, q: '' } : { state: 'err', key, url0, error: r.error };
+      r.ok ? Sound.done() : Sound.tick(700); renderMain(); setTimeout(() => $('#aQ')?.focus(), 50); break;
     }
-    case 'apiDel': { const l = [...(S.st.apis || [])]; l.splice(+v, 1); await save({ apis: l }); renderMain(); break; }
+    case 'apiPick': {
+      const c = S.apiCheck; if (!c || c.pinging) return;
+      if ((S.st.apis || []).some(a => a.url === c.url && a.key === c.key && a.model === v)) return;
+      c.pinging = v; const box = $('#aList'); if (box) box.innerHTML = apiModelList();
+      const a = { name: c.provider, url: c.url, key: c.key, kind: c.kind, model: v };
+      const r = await P.apiPing(a).catch(e => ({ ok: false, error: String(e.message || e) }));
+      c.pinging = null;
+      if (r.ok) { await save({ apis: [...(S.st.apis || []), a] }); toast(T('apiAdded')(c.provider, v)); Sound.done(); }
+      else { toast(r.error); Sound.tick(700); }
+      S._lastTab = 'api'; renderMain(); break;
+    }
+    case 'apiDel': { const l = [...(S.st.apis || [])]; l.splice(+v, 1); await save({ apis: l }); if (/^(api|tog):/.test(S.sel || '')) { S.sel = null; await save({ sel: null }); } Sound.tick(1200); S._lastTab = 'api'; renderMain(); break; }
     case 'sKey': await save({ searchKey: $('#sKey').value.trim() }); toast(T('saved')); break;
     case 'newChat': S.streaming?.abort(); S.msgs = []; S.chatId = null; S.lastProject = null; S._lastTab = null; renderNav(); renderMain(); break;
     case 'openChat': if (!e.target.closest('.bx')) openChat(v); break;
@@ -1647,7 +1727,7 @@ document.addEventListener('keydown', e => {
 });
 root.addEventListener('change', async e => {
   const t = e.target;
-  if (t.dataset.act === 'sel') S.sel = t.value;
+  if (t.dataset.act === 'sel') { S.sel = t.value; save({ sel: t.value }); Sound.tick(1500); }
   if (t.dataset.act === 'agentSel') { await save({ agent: t.value }); Sound.tick(1500); }
 });
 root.addEventListener('keydown', e => {
@@ -1655,7 +1735,9 @@ root.addEventListener('keydown', e => {
 });
 root.addEventListener('input', e => {
   if (e.target.id === 'input') { e.target.style.height = 'auto'; e.target.style.height = Math.min(200, e.target.scrollHeight) + 'px'; }
+  if (e.target.id === 'aQ' && S.apiCheck) { S.apiCheck.q = e.target.value; const b = $('#aList'); if (b) b.innerHTML = apiModelList(); }
 });
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.target.id === 'aKey' || e.target.id === 'aUrl')) { e.preventDefault(); root.querySelector('[data-act=apiCheck]')?.click(); } });
 function tempsHTML() {
   const t = S.temps || {}; const f = (n, v) => v ? `<span style="color:${v >= (t.limit || 80) ? '#ff8a80' : '#ddd'}">${n} ${Math.round(v)}°</span>` : '';
   return `${T('tempLbl')}${t.hot ? ' · <span style="color:#ff8a80">' + T('heatOn') + '</span>' : ''}<br><span class="mono">${[f('GPU', t.gpu), f('CPU', t.cpu)].filter(Boolean).join(' · ')}</span>`;
@@ -1685,7 +1767,7 @@ function applyTheme() { document.documentElement.classList.toggle('light', S.st.
 // ---------- boot ----------
 (async () => {
   S.st = await P.getSettings(); applyTheme();
-  if (S.st.apis) await save({ apis: [] });
+  if (S.st.apis) await save({ apis: S.st.apis.filter(a => a && a.url && a.model && a.cloud !== 'kimi').map(a => ({ ...a, kind: a.kind || (/anthropic\.com/.test(a.url) ? 'anthropic' : 'openai') })) });
   if (S.st.agent === 'team' || !['chat', 'coder', 'files', 'browser'].includes(S.st.agent || 'coder')) await save({ agent: 'chat' });
   if (S.st.lang) document.documentElement.lang = S.st.lang;
   if (!S.st.lang) langScreen(); else intro();
