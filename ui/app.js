@@ -231,7 +231,7 @@ async function appScreen() {
   P.monitor(S.st.load !== false);
 }
 function renderNav() {
-  const tabs = [['chat', 'tChat'], ['projects', 'tProjects'], ['models', 'tModels'], ['api', 'tApi'], ['opt', 'tOpt'], ['agents', 'tAgents']];
+  const tabs = [['chat', 'tChat'], ['projects', 'tProjects'], ['models', 'tModels'], ['api', 'tApi'], ['design', 'tDesign'], ['opt', 'tOpt'], ['agents', 'tAgents']];
   const hw = S.st.hw || {}; const [pname] = profile();
   const sp = S.running && S.st.speed && S.st.speed[S.running];
   $('#nav').innerHTML = `<div class="brand"><div class="dot led"></div>PULSAR</div>
@@ -250,7 +250,7 @@ function renderMain() {
   if (!same) { m.classList.remove('swap'); void m.offsetWidth; m.classList.add('swap'); }
   m.style.padding = S.tab === 'chat' ? '48px 56px 28px' : '';
   if (S.tab === 'projects') { m.innerHTML = viewProjects(); loadProjects(); }
-  else m.innerHTML = ({ chat: viewChat, models: viewModels, opt: viewOpt, agents: viewAgents, api: viewApi }[S.tab])();
+  else m.innerHTML = ({ chat: viewChat, models: viewModels, opt: viewOpt, agents: viewAgents, api: viewApi, design: viewDesign }[S.tab])();
   if (S.tab === 'chat') { hookScroll(); const box = $('#msgs'); toBottom(box); $('#input')?.focus(); showBoost(); }
 }
 
@@ -506,6 +506,22 @@ function apiModelList() {
       <span class="mono">${esc(m.id)}</span><span class="small muted">${c.pinging === m.id ? `<span class="shimmer">${T('apiPinging')}</span>` : have.has(m.id) ? T('apiOn') : m.free ? T('apiFree') : ''}</span></button>`).join('')
     : `<div class="muted small" style="padding:12px">${T('apiNoMatch')}</div>`;
 }
+// ---------- design ----------
+function viewDesign() {
+  const on = designOn(), cur = designTheme();
+  const sw = id => { const v = Object.fromEntries(DESIGN.THEMES[id].vars.split(';').map(x => x.split(':'))); return `<span class="dswatch" style="background:${v['--bg']};border-color:${v['--line']}"><i style="background:${v['--fg']}"></i><i style="background:${v['--accent']}"></i><i style="background:${v['--accent2']}"></i></span>`; };
+  return `<h2 class="fu">${T('tDesign')}</h2><p class="sub fu" style="animation-delay:.08s">${T('designSub')}</p>
+  <button class="card fu ${on ? 'on' : ''}" data-act="designTgl" style="width:100%;max-width:860px;margin-bottom:26px;animation-delay:.12s">
+    <span class="row"><span style="font-size:22px;font-weight:400">${T('designMode')}</span><span class="tgl ${on ? 'on' : ''}" style="pointer-events:none"><span class="knob"></span>${on ? T('on') : T('off')}</span></span>
+    <span class="muted" style="font-size:14px;line-height:1.5">${on ? T('designOnD') : T('designOffD')}</span></button>
+  <div class="sec fu" style="animation-delay:.16s">${T('designStyles')}</div>
+  <div class="grid fu" style="animation-delay:.18s;${on ? '' : 'opacity:.35;pointer-events:none'}">${Object.entries(DESIGN.THEMES).map(([id, t], i) => `<div class="card dcard ${cur === id ? 'on' : ''}" data-act="designTheme" data-v="${id}" style="animation-delay:${.2 + i * .05}s">
+      ${sw(id)}<span style="font-size:20px;font-weight:400">${esc(t[L()])}</span><span class="small muted" style="line-height:1.5">${esc(t['d' + L()])}</span>
+      <span class="row" style="justify-content:flex-start;gap:8px"><span class="mono small">${cur === id ? '● ' + T('designChosen') : ''}</span><button class="cb" data-act="designPreview" data-v="${id}">${T('designPreview')}</button></span></div>`).join('')}</div>
+  <div class="sec fu" style="animation-delay:.3s;margin-top:30px">${T('designBlocks')(DESIGN.BLOCKS.length, DESIGN.EXAMPLES.length)}</div>
+  <div class="chips fu" style="animation-delay:.32s;flex-wrap:wrap;max-width:860px">${DESIGN.BLOCKS.map(b => `<span class="pill">${esc(b[1])}</span>`).join('')}</div>`;
+}
+
 // ---------- projects ----------
 async function loadProjects() {
   let list = []; try { list = await P.ws.list('.'); } catch (e) {}
@@ -743,6 +759,7 @@ function paintNow(i) {
 function setSendBtn() { const b = root.querySelector('.send'); if (!b) return; b.dataset.act = S.streaming ? 'stop' : 'send'; b.innerHTML = sendIcon(); }
 
 // --- model transport (through main process) ---
+const designOn = () => S.st.design !== false, designTheme = () => S.st.designTheme || 'apple';
 const LOCAL_T = { base: 'http://127.0.0.1:18089/v1', key: '', model: 'local', kind: 'local', local: true };
 const isTog = sel => /^tog:/.test(sel || ''), isApi = sel => /^api:/.test(sel || '');
 function apiT(i) { const a = (S.st.apis || [])[+i]; return a ? { base: a.url, key: a.key, model: a.model, kind: a.kind || 'openai', name: a.name } : null; }
@@ -856,6 +873,7 @@ async function execAction(a, repaint, auto) {
   try {
     let res;
     if (a.kind === 'file') {
+      if (/\.html?$/i.test(a.arg) && designOn() && DESIGN.uses(a.body)) a.body = DESIGN.apply(a.body, designTheme());
       await P.ws.write(a.arg, a.body); res = `File saved: ${a.arg}`;
       if (S.editFile === a.arg && ED) ED.set(a.body, a.arg);
       const lang = (a.arg.split('.').pop() || '').toLowerCase();
@@ -1430,23 +1448,25 @@ async function runChain(text, signal, plan) {
   const codes = await limitAll(pages, slots(), async (pg, k) => {
     await waitCool();
     const p = jobs[k]; p.status = 'work'; paint(idx);
-    const sys = coder[3] + (plan.site
+    const kit = plan.site && designOn();
+    const sys = coder[3] + (kit ? DESIGN.prompt(designTheme(), lang) + '\nThese design-system rules override any CSS advice above.' : '') + (plan.site
       ? ` Output ONLY one complete HTML file in a single \`\`\`html block (all CSS and JS inside), then one short sentence.${pages.length > 1 ? ` This is page "${pg.file}" of a site with pages: ${nav}. Every page has the same header with links to all pages, the same footer, colors and fonts.` : ''}`
       : ' Output the complete program in one code block, then a short explanation of how to run it.') + ` Never say you cannot save or open files. Answer in ${lang}.`;
-    const user = pg.code ? `Change request: ${text}\n\nCurrent code of ${pg.file} (keep everything that was not asked to change, return the whole updated file):\n\`\`\`${plan.site ? 'html' : ''}\n${pg.code.slice(0, 24000)}\n\`\`\`` : `Request: ${text}${pages.length > 1 ? `\n\nThis page: ${pg.file} — ${pg.title}. Content: ${pg.purpose}` : ''}${brief ? `\n\nDesign reference from the examples (recreate this style and structure with the user's own content):\n${brief.slice(0, 5000)}` : ''}`;
+    const shots = kit && !pg.code ? DESIGN.pickExamples(text, onlyCloud() ? 3 : (S.runPlan?.ctx || 8192) >= 12288 ? 2 : 1).flatMap(e => [{ role: 'user', content: 'Request: ' + e.q }, { role: 'assistant', content: '```html\n<!DOCTYPE html>\n<html lang="ru">\n<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + e.q.slice(0, 40) + '</title></head>\n<body>\n' + e.a + '\n</body>\n</html>\n```\nГотово.' }]) : [];
+    const user = pg.code ? `Change request: ${text}\n\nCurrent code of ${pg.file} (keep everything that was not asked to change, return the whole updated file):\n\`\`\`${plan.site ? 'html' : ''}\n${DESIGN.strip(pg.code).slice(0, 24000)}\n\`\`\`` : `Request: ${text}${pages.length > 1 ? `\n\nThis page: ${pg.file} — ${pg.title}. Content: ${pg.purpose}` : ''}${brief ? `\n\nDesign reference from the examples (recreate this style and structure with the user's own content):\n${brief.slice(0, 5000)}` : ''}`;
     const meta = {};
     if (isTog(S.sel) && S.running) {
       // the local model builds its own version in parallel; the version with fewer problems wins
       p.name = 'API · ' + p.name;
       const q = part(`${T('srcPc')} · ${coder[1]}${pages.length > 1 ? ' #' + (k + 1) : ''}`, p.task); const lm = {};
-      const mine = (async () => { try { await stream([{ role: 'system', content: sys }, { role: 'user', content: user }], signal, c => { q.content += c; paint(idx); }, { temperature: 0.3 }, { tgt: LOCAL_T }); } catch (e) { if (e.name === 'AbortError') throw e; } q.status = 'done'; paint(idx); })();
-      await Promise.all([mine, stream([{ role: 'system', content: sys }, { role: 'user', content: user }], signal, c => { p.content += c; paint(idx); }, { temperature: 0.3 }, meta).catch(e => { if (e.name === 'AbortError') throw e; })]);
+      const mine = (async () => { try { await stream([{ role: 'system', content: sys }, ...shots, { role: 'user', content: user }], signal, c => { q.content += c; paint(idx); }, { temperature: 0.3 }, { tgt: LOCAL_T }); } catch (e) { if (e.name === 'AbortError') throw e; } q.status = 'done'; paint(idx); })();
+      await Promise.all([mine, stream([{ role: 'system', content: sys }, ...shots, { role: 'user', content: user }], signal, c => { p.content += c; paint(idx); }, { temperature: 0.3 }, meta).catch(e => { if (e.name === 'AbortError') throw e; })]);
       p.status = 'done';
       const A = extractCode(p.content, plan.site), Bc = extractCode(q.content, plan.site);
       if (A && Bc) { const [pa, pb] = await Promise.all([autoCheck(A, plan.site), autoCheck(Bc, plan.site)]); const win = pb.length < pa.length || (pb.length === pa.length && Bc.code.length > A.code.length * 1.3) ? Bc : A; (win === A ? p : q).task += ' · ' + T('dbWin'); paint(idx); return win; }
       paint(idx); return A || Bc;
     }
-    await stream([{ role: 'system', content: sys }, { role: 'user', content: user }], signal, c => { p.content += c; paint(idx); }, { temperature: 0.3 }, meta);
+    await stream([{ role: 'system', content: sys }, ...shots, { role: 'user', content: user }], signal, c => { p.content += c; paint(idx); }, { temperature: 0.3 }, meta);
     if (meta.finish === 'loop') p.content = p.content.slice(0, p.content.length - (meta.loopCut || 0));
     for (let r = 0; r < 4 && meta.finish === 'length'; r++) {
       meta.finish = null;
@@ -1495,6 +1515,7 @@ async function runChain(text, signal, plan) {
   } else {
     for (const c of valid) { const n = progName(c, text); files.push({ path: await uniqueName(`${n.nm}.${n.ext}`), code: c.code }); }
   }
+  if (plan.site && designOn()) files.forEach(f => { if (/\.html?$/i.test(f.path)) f.code = DESIGN.apply(f.code, designTheme()); });
   const ok = await askSave(msg, idx, files.map(f => f.path));
   if (ok) {
     for (const f of files) await P.ws.write(f.path, f.code);
@@ -1629,6 +1650,9 @@ root.addEventListener('click', async e => {
     case 'folder': P.openModels(); break;
     case 'autoAgentCard': await save({ autoAgent: S.st.autoAgent === false }); Sound.tick(1500); renderMain(); break;
     case 'agent': await save({ agent: v, autoAgent: false }); Sound.tick(1500); renderMain(); break;
+    case 'designTgl': await save({ design: !designOn() }); Sound.tick(1500); S._lastTab = 'design'; renderMain(); break;
+    case 'designTheme': if (e.target.closest('[data-act=designPreview]')) break; await save({ designTheme: v }); Sound.tick(1500); S._lastTab = 'design'; renderMain(); break;
+    case 'designPreview': { const k = Math.floor(Math.random() * DESIGN.EXAMPLES.length); browse('data:text/html;charset=utf-8,' + encodeURIComponent(DESIGN.preview(v, k)), true); break; }
     case 'apiCheck': {
       const key = $('#aKey').value.trim(), url0 = $('#aUrl').value.trim();
       S.apiCheck = { state: 'work', key, url0 }; S._lastTab = 'api'; renderMain(); Sound.soft();

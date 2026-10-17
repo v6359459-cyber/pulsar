@@ -284,3 +284,7 @@ main.swap>*{animation:viewIn .5s cubic-bezier(.2,.8,.2,1) both}
 .arow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 16px;background:none;border:0;border-bottom:1px solid #111;color:#ddd;text-align:left;font-size:13px;cursor:pointer;transition:background .2s,color .2s}
 .arow:hover{background:#0c0c0c;color:#fff}.arow.on{color:#fff}.arow.on .small{color:#fff}.arow:disabled{cursor:default;opacity:.6}
 .apicard{cursor:default;padding:16px 20px}.apiok{color:#ddd;white-space:nowrap}
+
+.dcard{cursor:pointer;gap:12px}.dcard.on{border-color:#fff}
+.dswatch{display:flex;gap:6px;align-items:center;height:64px;border-radius:14px;border:1px solid;padding:0 16px;transition:transform .5s cubic-bezier(.2,.9,.25,1)}.dcard:hover .dswatch{transform:scale(1.02)}
+.dswatch i{width:22px;height:22px;border-radius:11px;display:block;box-shadow:0 0 0 1px rgba(127,127,127,.25)}

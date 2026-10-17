@@ -203,3 +203,10 @@ Object.assign(I18N.en, { tApi: 'API', srcPc: 'PC', srcTog: 'Together', apiSub2: 
   apiUrlOpt: 'API address — optional, only for your own or a rare service', apiCheckBtn: 'Check', apiChecking: 'Checking the key…', apiKeyOk: (p, n) => `Key works · ${p} · ${n} models. Pick a model:`,
   apiSearch: 'Search models…', apiPinging: 'checking…', apiFree: 'free', apiNoMatch: 'Nothing found', apiOn: 'API connected', apiConnected: 'Connected APIs', apiNone: 'No APIs yet',
   apiAdded: (p, m) => `API connected · ${p} · ${m}`, dbAnswer: 'answering', dbCritique: 'reviewing the rival answer', dbMerge: 'Building the best answer from both', dbFail: 'Both models failed to answer.', dbWin: 'chosen as best' });
+
+Object.assign(I18N.ru, { tDesign: 'Дизайн', designSub: 'Как агенты оформляют сайты. Готовые блоки в стиле shadcn/ui: модель собирает страницу из них, а PULSAR добавляет стили и анимации — сайты выходят ровными даже у маленьких моделей.',
+  designMode: 'Режим дизайна', designOnD: 'Включён: сайты собираются из готовых блоков в выбранном стиле.', designOffD: 'Выключен: модель оформляет сайт сама, как умеет.',
+  designStyles: 'Стиль', designChosen: 'выбран', designPreview: 'Предпросмотр', designBlocks: (b, e) => `Блоки · ${b} · примеров для модели: ${e}` });
+Object.assign(I18N.en, { tDesign: 'Design', designSub: 'How agents style websites. Ready shadcn/ui-style blocks: the model builds the page from them and PULSAR adds the styles and animations — sites look clean even with small models.',
+  designMode: 'Design mode', designOnD: 'On: sites are built from ready blocks in the chosen style.', designOffD: 'Off: the model styles the site on its own.',
+  designStyles: 'Style', designChosen: 'selected', designPreview: 'Preview', designBlocks: (b, e) => `Blocks · ${b} · examples for the model: ${e}` });
