@@ -506,9 +506,6 @@ function viewApi() {
       <div class="row"><span style="display:flex;flex-direction:column;gap:4px"><span style="font-size:18px;font-weight:400">${esc(a.name)}</span><span class="mono small muted">${esc(a.model)} · ••••${esc((a.key || '').slice(-4))}</span></span>
       <span style="display:flex;align-items:center;gap:12px"><span class="mono small apiok">● ${a.err ? esc(a.err) : T('apiOn')}</span><button class="btn ghost sm" data-act="apiDel" data-v="${i}">${T('del')}</button></span></div></div>`).join('')
       : `<div class="muted small">${T('apiNone')}</div>`}
-    <label class="field" style="margin-top:28px">${T('searchKey')}<input id="sKey" type="password" class="mono" value="${esc(S.st.searchKey || '')}"></label>
-    <label class="field">${T('pexelsKey')} <button class="cb" data-act="extLink" data-v="https://www.pexels.com/api/">pexels.com/api</button><input id="pKey" type="password" class="mono" value="${esc(S.st.pexelsKey || '')}"></label>
-    <button class="btn ghost sm" style="align-self:flex-start" data-act="sKey">${T('save')}</button>
   </div>`;
 }
 async function apiCheckNow() {
