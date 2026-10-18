@@ -778,6 +778,8 @@ ipcMain.handle('ws:download', async (_e, { url, rel, alt }) => {
 
 // ---------- voice: whisper.cpp + ggml-small, downloaded on first use ----------
 const VOICE = () => path.join(DATA(), 'voice');
+// newer whisper.cpp releases (v1.9.3+) ship sources only, so /releases/latest has no Windows build: pin the last one that does
+const WHISPER_URL = 'https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.2/whisper-bin-x64.zip';
 function whisperExe() {
   const bundled = path.join(process.resourcesPath || '', 'engine', 'whisper'), dev = path.join(__dirname, 'engine', 'whisper');
   for (const d of [bundled, dev, VOICE()]) { if (!fs.existsSync(d)) continue; const f = findFile(d, 'whisper-cli.exe') || findFile(d, 'main.exe'); if (f) return f; }
@@ -788,11 +790,8 @@ ipcMain.handle('voice:setup', async () => {
   try {
     fs.mkdirSync(VOICE(), { recursive: true });
     if (!whisperExe()) {
-      const rel = await (await fetch('https://api.github.com/repos/ggml-org/whisper.cpp/releases/latest', { headers: { 'User-Agent': 'PULSAR' } })).json();
-      const a = (rel.assets || []).find(x => /^whisper-bin-x64\.zip$/i.test(x.name)) || (rel.assets || []).find(x => /bin-x64\.zip$/i.test(x.name) && !/cublas|cuda/i.test(x.name));
-      if (!a) throw new Error('whisper build not found');
       const zip = path.join(VOICE(), 'w.zip');
-      await download(a.browser_download_url, zip, (g, t) => send('voice:progress', { part: 'bin', got: g, total: t }));
+      await download(WHISPER_URL, zip, (g, t) => send('voice:progress', { part: 'bin', got: g, total: t }));
       await unzip(zip, VOICE()); try { fs.unlinkSync(zip); } catch {}
       if (!whisperExe()) throw new Error('whisper-cli.exe not found');
     }

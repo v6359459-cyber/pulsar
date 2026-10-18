@@ -498,9 +498,8 @@ function viewApi() {
   const pick = c.state === 'ok' ? `<div class="apipick fu"><input id="aQ" class="mono" placeholder="${T('apiSearch')}" value="${esc(c.q || '')}" autocomplete="off"><div id="aList" class="alist">${apiModelList()}</div></div>` : '';
   return `<h2 class="fu">API</h2><p class="sub fu" style="animation-delay:.08s">${T('apiSub2')}</p>
   <div class="fu" style="animation-delay:.14s;max-width:640px;display:flex;flex-direction:column;gap:14px">
-    <label class="field">${T('apiKey')}<input id="aKey" type="password" class="mono" placeholder="sk-… · gsk_… · AIza… · sk-ant-… · sk-or-…" value="${esc(c.key || '')}" autocomplete="off"></label>
-    <label class="field">${T('apiUrlOpt')}<input id="aUrl" class="mono" placeholder="https://… /v1" value="${esc(c.url0 || '')}" autocomplete="off"></label>
-    <div class="row" style="justify-content:flex-start;gap:10px"><button class="btn" data-act="apiCheck" ${c.state === 'work' ? 'disabled' : ''}>${T('apiCheckBtn')}</button></div>
+    <label class="field">${T('apiKey')}<input id="aKey" type="text" spellcheck="false" class="mono" placeholder="sk-… · gsk_… · AIza… · sk-ant-… · sk-or-…" value="${esc(c.key || '')}" autocomplete="off"></label>
+    <label class="field">${T('apiName')}<input id="aName" class="mono" placeholder="${T('apiNamePh')}" value="${esc(S.apiName || '')}" autocomplete="off"></label>
     ${status}${pick}
     <div class="sec" style="margin-top:26px">${T('apiConnected')} · ${apis.length}</div>
     ${apis.length ? apis.map((a, i) => `<div class="card apicard fu" style="animation-delay:${.05 * i}s">
@@ -511,6 +510,13 @@ function viewApi() {
     <label class="field">${T('pexelsKey')} <button class="cb" data-act="extLink" data-v="https://www.pexels.com/api/">pexels.com/api</button><input id="pKey" type="password" class="mono" value="${esc(S.st.pexelsKey || '')}"></label>
     <button class="btn ghost sm" style="align-self:flex-start" data-act="sKey">${T('save')}</button>
   </div>`;
+}
+async function apiCheckNow() {
+  const key = ($('#aKey')?.value || '').trim();
+  S.apiCheck = { state: 'work', key, url0: '' }; S._lastTab = 'api'; renderMain(); Sound.soft();
+  const r = await P.apiCheck(key, '').catch(e => ({ ok: false, error: String(e.message || e) }));
+  S.apiCheck = r.ok ? { state: 'ok', key, url0: '', provider: r.provider, url: r.url, kind: r.kind, models: r.models, q: '' } : { state: 'err', key, url0: '', error: r.error };
+  r.ok ? Sound.done() : Sound.tick(700); renderMain(); setTimeout(() => $('#aQ')?.focus(), 50);
 }
 function apiModelList() {
   const c = S.apiCheck; if (!c || !c.models) return '';
@@ -1296,35 +1302,41 @@ function askHTML(a) {
 function cool(signal) {
   return new Promise(res => { const t0 = Date.now(); const tick = () => { if (!S.temps?.hot || signal?.aborted || Date.now() - t0 > 120000) return res(); setTimeout(tick, 2000); }; tick(); });
 }
-// local model and API answer in parallel, criticize each other, the API writes the best final answer
+// the local model and every connected API answer, argue for 2 rounds (review -> improve), vote; the winner's answer is shown
 async function debate(msg, idx, messages, userText, signal) {
-  const api = target(), lm = findM(S.running);
-  const lang = L() === 'ru' ? 'Russian' : 'English';
-  msg.debate = true; msg.live = false;
-  const a = { name: `${T('srcPc')} · ${lm ? lm.name : 'local'}`, task: T('dbAnswer'), status: 'work', content: '', t: LOCAL_T };
-  const b = { name: `API · ${api.model}`, task: T('dbAnswer'), status: 'work', content: '', t: api };
-  msg.parts = [a, b]; paint(idx);
-  const run = async (p, msgs, extra) => { try { const meta = { tgt: p.t }; await stream(msgs, signal, c => { p.content += c; paint(idx); }, extra, meta); p.status = 'done'; } catch (e) { if (e.name === 'AbortError') throw e; p.status = 'error'; p.content += '\n⚠ ' + (e.message || e); } paint(idx); };
-  await Promise.all([run(a, messages), run(b, messages)]);
-  const ans = p => noThink(p.content).trim();
-  const ok = [a, b].filter(p => p.status === 'done' && ans(p));
+  const lm = findM(S.running), lang = L() === 'ru' ? 'Russian' : 'English';
+  const P = [];
+  if (lm) P.push({ name: `${T('srcPc')} · ${lm.name}`, t: LOCAL_T });
+  (S.st.apis || []).forEach((a, i) => { const t = apiT(i); if (t) P.push({ name: `${a.name} · ${a.model}`, t }); });
+  msg.debate = true; msg.live = false; msg.parts = [];
+  const step = (list, task) => list.map(p => { const x = { name: p.name, task, status: 'work', content: '', t: p.t }; msg.parts.push(x); return x; });
+  const run = async (x, msgs, extra) => { try { await stream(msgs, signal, c => { x.content += c; paint(idx); }, extra, { tgt: x.t }); x.status = 'done'; } catch (e) { if (e.name === 'AbortError') throw e; x.status = 'error'; x.content += '\n⚠ ' + (e.message || e); } paint(idx); };
+  const ans = x => noThink(x.content).trim(), good = x => x.status === 'done' && ans(x);
+  const L1 = i => String.fromCharCode(65 + i);
+  const first = step(P, T('dbAnswer')); paint(idx);
+  await Promise.all(first.map(x => run(x, messages)));
+  const ok = first.filter(good);
   if (ok.length < 2) { msg.content = ok.length ? ans(ok[0]) : T('dbFail'); msg.parts.forEach(p => p.status = p.status === 'work' ? 'done' : p.status); paint(idx); return; }
-  // each one criticizes the other
-  const ca = { name: a.name, task: T('dbCritique'), status: 'work', content: '', t: LOCAL_T }, cb = { name: b.name, task: T('dbCritique'), status: 'work', content: '', t: api };
-  msg.parts.push(ca, cb); paint(idx);
-  const crit = other => [{ role: 'system', content: `You are a strict reviewer. Find factual errors, bugs, missing parts and weak points in the other assistant's answer. Short list, max 8 points. If it is good, say what is best in it. Answer in ${lang}.` },
-    { role: 'user', content: `Request: ${userText.slice(0, 6000)}\n\nAnswer to review:\n${ans(other).slice(0, 12000)}` }];
-  await Promise.all([run(ca, crit(b), { temperature: 0.2 }), run(cb, crit(a), { temperature: 0.2 })]);
-  // the best final answer
+  const list = ok.map(x => ({ name: x.name, t: x.t }));
+  // round 1: everyone reviews everyone else's answer
+  const rev = step(list, T('dbCritique')); paint(idx);
+  await Promise.all(rev.map((x, i) => run(x, [{ role: 'system', content: `You are a strict reviewer. Find factual errors, bugs, missing parts and weak points in the other answers. For each answer write a short list, max 5 points. If an answer is good, say what is best in it. Refer to answers by their letter. Answer in ${lang}.` },
+    { role: 'user', content: `Request: ${userText.slice(0, 6000)}\n\n` + ok.map((o, k) => k === i ? '' : `=== Answer ${L1(k)} ===\n${ans(o).slice(0, 6000)}`).filter(Boolean).join('\n\n') }], { temperature: 0.2 })));
+  // round 2: everyone improves their own answer using the reviews written by the others
+  const imp = step(list, T('dbRevise')); paint(idx);
+  const sys = messages[0].content + `\nYou now write the FINAL version of your own answer. You get your previous answer and the reviews other assistants wrote about the answers. Fix every real problem they found, keep what is right, and write one complete answer. Do not mention reviews, other assistants or the debate. If the task needs action blocks, include them in full.`;
+  await Promise.all(imp.map((x, i) => run(x, [{ role: 'system', content: sys }, { role: 'user', content: `Request: ${userText.slice(0, 8000)}\n\n=== Your previous answer ===\n${ans(ok[i]).slice(0, 12000)}\n\n=== Reviews ===\n` + rev.map((r, k) => k === i || !good(r) ? '' : `Review by ${L1(k)}:\n${ans(r).slice(0, 2500)}`).filter(Boolean).join('\n\n') }], { temperature: 0.3 })));
+  const finals = imp.map((x, i) => good(x) ? x : ok[i]);
+  // vote: each one picks the best final answer, the most votes win (a tie goes to the earlier one)
   msg.stage = 'merge'; paint(idx);
-  const sys = messages[0].content + `\nYou now write the FINAL answer. You get two answers to the same request (A — local model, B — cloud model) and their reviews of each other. Take the best and correct parts of both, fix every real problem the reviews found, and write one complete best answer for the user. Do not mention A, B, models, reviews or the debate. If the task needs action blocks, include them in full.`;
-  const meta = { tgt: api };
-  try {
-    await stream([{ role: 'system', content: sys }, { role: 'user', content: `Request: ${userText.slice(0, 8000)}\n\n=== Answer A ===\n${ans(a).slice(0, 14000)}\n\n=== Answer B ===\n${ans(b).slice(0, 14000)}\n\n=== Review of B by A ===\n${ans(ca).slice(0, 4000)}\n\n=== Review of A by B ===\n${ans(cb).slice(0, 4000)}` }],
-      signal, c => { msg.content += c; paint(idx); }, { temperature: 0.3 }, meta);
-  } catch (e) { if (e.name === 'AbortError') throw e; msg.content = ans(b) || ans(a); }
-  if (!noThink(msg.content).trim()) msg.content = ans(b) || ans(a);
-  msg.stage = 'done'; paint(idx);
+  const votes = finals.map(() => 0);
+  await Promise.all(finals.map(async (_, i) => {
+    let out = ''; try { await stream([{ role: 'system', content: 'You are a judge. Pick the best answer to the request: correct, complete, useful. Reply with ONE letter only.' },
+      { role: 'user', content: `Request: ${userText.slice(0, 4000)}\n\n` + finals.map((f, k) => `=== Answer ${L1(k)} ===\n${ans(f).slice(0, 5000)}`).join('\n\n') }], signal, c => { out += c; }, { temperature: 0 }, { tgt: list[i].t }); } catch (e) { if (e.name === 'AbortError') throw e; }
+    const k = (noThink(out).match(/[A-Z]/) || [''])[0].charCodeAt(0) - 65; if (k >= 0 && k < votes.length) votes[k]++;
+  }));
+  let w = 0; votes.forEach((v, k) => { if (v > votes[w]) w = k; });
+  msg.content = ans(finals[w]); msg.stage = 'done'; paint(idx);
 }
 async function runAgent(ag, userText, signal) {
   S.curAgentName = ag.name;
@@ -1804,21 +1816,15 @@ root.addEventListener('click', async e => {
     case 'designTgl': await save({ design: !designOn() }); Sound.tick(1500); S._lastTab = 'design'; renderMain(); break;
     case 'designTheme': if (e.target.closest('[data-act=designPreview]')) break; await save({ designTheme: v }); Sound.tick(1500); S._lastTab = 'design'; renderMain(); break;
     case 'designPreview': { const k = Math.floor(Math.random() * DESIGN.EXAMPLES.length); browse('data:text/html;charset=utf-8,' + encodeURIComponent(DESIGN.preview(v, k)), true); break; }
-    case 'apiCheck': {
-      const key = $('#aKey').value.trim(), url0 = $('#aUrl').value.trim();
-      S.apiCheck = { state: 'work', key, url0 }; S._lastTab = 'api'; renderMain(); Sound.soft();
-      const r = await P.apiCheck(key, url0).catch(e => ({ ok: false, error: String(e.message || e) }));
-      S.apiCheck = r.ok ? { state: 'ok', key, url0, provider: r.provider, url: r.url, kind: r.kind, models: r.models, q: '' } : { state: 'err', key, url0, error: r.error };
-      r.ok ? Sound.done() : Sound.tick(700); renderMain(); setTimeout(() => $('#aQ')?.focus(), 50); break;
-    }
+    case 'apiCheck': await apiCheckNow(); break;
     case 'apiPick': {
       const c = S.apiCheck; if (!c || c.pinging) return;
       if ((S.st.apis || []).some(a => a.url === c.url && a.key === c.key && a.model === v)) return;
       c.pinging = v; const box = $('#aList'); if (box) box.innerHTML = apiModelList();
-      const a = { name: c.provider, url: c.url, key: c.key, kind: c.kind, model: v };
+      const nm = ($('#aName')?.value || S.apiName || '').trim() || c.provider; const a = { name: nm, url: c.url, key: c.key, kind: c.kind, model: v };
       const r = await P.apiPing(a).catch(e => ({ ok: false, error: String(e.message || e) }));
       c.pinging = null;
-      if (r.ok) { await save({ apis: [...(S.st.apis || []), a] }); toast(T('apiAdded')(c.provider, v)); Sound.done(); }
+      if (r.ok) { await save({ apis: [...(S.st.apis || []), a] }); S.apiName = ''; toast(T('apiAdded')(nm, v)); Sound.done(); }
       else { toast(r.error); Sound.tick(700); }
       S._lastTab = 'api'; renderMain(); break;
     }
@@ -1912,9 +1918,11 @@ root.addEventListener('keydown', e => {
 });
 root.addEventListener('input', e => {
   if (e.target.id === 'input') { e.target.style.height = 'auto'; e.target.style.height = Math.min(200, e.target.scrollHeight) + 'px'; }
+  if (e.target.id === 'aName') S.apiName = e.target.value;
+  if (e.target.id === 'aKey') { clearTimeout(S._ak); const v = e.target.value.trim(); if (v.length >= 20 && !/\s/.test(v) && S.apiCheck?.key !== v) S._ak = setTimeout(apiCheckNow, 700); }
   if (e.target.id === 'aQ' && S.apiCheck) { S.apiCheck.q = e.target.value; const b = $('#aList'); if (b) b.innerHTML = apiModelList(); }
 });
-document.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.target.id === 'aKey' || e.target.id === 'aUrl')) { e.preventDefault(); root.querySelector('[data-act=apiCheck]')?.click(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'aKey') { e.preventDefault(); clearTimeout(S._ak); apiCheckNow(); } });
 function tempsHTML() {
   const t = S.temps || {}; const f = (n, v) => v ? `<span style="color:${v >= (t.limit || 80) ? '#ff8a80' : '#ddd'}">${n} ${Math.round(v)}°</span>` : '';
   return `${T('tempLbl')}${t.hot ? ' · <span style="color:#ff8a80">' + T('heatOn') + '</span>' : ''}<br><span class="mono">${[f('GPU', t.gpu), f('CPU', t.cpu)].filter(Boolean).join(' · ')}</span>`;

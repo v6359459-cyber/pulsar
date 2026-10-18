@@ -195,14 +195,14 @@ Object.assign(I18N.en, { mb: 'MB', updWait: 'Installing takes up to a minute, PU
 Object.assign(I18N.ru, { browserOpened: 'Открыл браузер справа. Скажи, какой сайт открыть.' });
 Object.assign(I18N.en, { browserOpened: 'The browser is open on the right. Tell me which site to open.' });
 
-Object.assign(I18N.ru, { tApi: 'API', srcPc: 'ПК', srcTog: 'Вместе', apiSub2: 'Вставь ключ любого сервиса нейросетей и нажми «Проверить». PULSAR сам поймёт, чей это ключ, и покажет модели. Ключи хранятся только на этом компьютере.',
+Object.assign(I18N.ru, { tApi: 'API', srcPc: 'ПК', srcTog: 'Вместе', apiSub2: 'Вставь ключ нейросети — PULSAR сам определит сервис и покажет доступные модели. Ключи хранятся только на этом ПК.',
   apiUrlOpt: 'Адрес API — необязательно, только для своего или редкого сервиса', apiCheckBtn: 'Проверить', apiChecking: 'Проверяю ключ…', apiKeyOk: (p, n) => `Ключ работает · ${p} · моделей: ${n}. Выбери модель:`,
   apiSearch: 'Поиск модели…', apiPinging: 'проверяю…', apiFree: 'бесплатно', apiNoMatch: 'Ничего не найдено', apiOn: 'API подключён', apiConnected: 'Подключённые API', apiNone: 'Пока ни одного API',
-  apiAdded: (p, m) => `API подключён · ${p} · ${m}`, dbAnswer: 'отвечает', dbCritique: 'проверяет ответ соперника', dbMerge: 'Собираю лучший ответ из обоих', dbFail: 'Обе модели не ответили.', dbWin: 'выбран лучший' });
-Object.assign(I18N.en, { tApi: 'API', srcPc: 'PC', srcTog: 'Together', apiSub2: 'Paste a key from any AI service and press Check. PULSAR detects the provider and shows its models. Keys stay on this computer.',
+  apiAdded: (p, m) => `API подключён · ${p} · ${m}`, dbAnswer: 'отвечает', dbCritique: 'проверяет ответы соперников', dbRevise: 'дорабатывает свой ответ', dbMerge: 'Выбираю лучший ответ', dbFail: 'Ни одна модель не ответила.', apiName: 'Имя API', apiNamePh: 'Любое имя, например Мой Groq', dbWin: 'выбран лучший' });
+Object.assign(I18N.en, { tApi: 'API', srcPc: 'PC', srcTog: 'Together', apiSub2: 'Paste an AI key — PULSAR detects the service and shows its available models. Keys stay on this PC.',
   apiUrlOpt: 'API address — optional, only for your own or a rare service', apiCheckBtn: 'Check', apiChecking: 'Checking the key…', apiKeyOk: (p, n) => `Key works · ${p} · ${n} models. Pick a model:`,
   apiSearch: 'Search models…', apiPinging: 'checking…', apiFree: 'free', apiNoMatch: 'Nothing found', apiOn: 'API connected', apiConnected: 'Connected APIs', apiNone: 'No APIs yet',
-  apiAdded: (p, m) => `API connected · ${p} · ${m}`, dbAnswer: 'answering', dbCritique: 'reviewing the rival answer', dbMerge: 'Building the best answer from both', dbFail: 'Both models failed to answer.', dbWin: 'chosen as best' });
+  apiAdded: (p, m) => `API connected · ${p} · ${m}`, dbAnswer: 'answering', dbCritique: 'reviewing the rival answers', dbRevise: 'improving its answer', dbMerge: 'Picking the best answer', dbFail: 'No model answered.', apiName: 'API name', apiNamePh: 'Any name, e.g. My Groq', dbWin: 'chosen as best' });
 
 Object.assign(I18N.ru, { tDesign: 'Дизайн', designSub: 'Как агенты оформляют сайты. Готовые блоки в стиле shadcn/ui: модель собирает страницу из них, а PULSAR добавляет стили и анимации — сайты выходят ровными даже у маленьких моделей.',
   designMode: 'Режим дизайна', designOnD: 'Включён: сайты собираются из готовых блоков в выбранном стиле.', designOffD: 'Выключен: модель оформляет сайт сама, как умеет.',
