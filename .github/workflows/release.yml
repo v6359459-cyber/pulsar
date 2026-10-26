@@ -18,6 +18,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Syntax check every script
+        shell: bash
+        run: for f in main.js preload.js ui/*.js scripts/*.js build/*.js; do node --check "$f" || exit 1; done
+      - name: Smoke test
+        run: node scripts/smoke.js
       - name: Download llama.cpp engine
         run: node scripts/fetch-engine.js
         env:

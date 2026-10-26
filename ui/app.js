@@ -124,9 +124,19 @@ function plan(m) {
   }
   return { ngl, fit, ctx, threads, slots, cpuMoe, speed: measured || speed, measured: !!measured, gpu: ngl > 0, draftRoom: draftRoom && ngl === 999 && !cpuMoe };
 }
+// How many agents really run in parallel. plan() only guesses from free video memory;
+// engine:start may have fallen back to a single slot, and an overheating GPU drops to one too.
+// The card used to show the guess while the chain ran the real number — hence "2 above, 1 below".
+function realSlots(id) {
+  if (onlyCloud()) return 3;
+  if (id && S.running === id) return S.temps && S.temps.hot ? 1 : Math.max(1, S.slots || 1);
+  return null; // not running: the card shows the plan, marked as a forecast
+}
 function planText(m, p) {
   const gpuPart = p.cpuMoe ? `${T('onGpu')} + ${T('inRam')}` : p.ngl === 999 ? `${m.layers}/${m.layers} ${T('onGpu')}` : p.ngl > 0 ? `${p.ngl}/${m.layers} ${T('onGpu')}, ${T('inRam')}` : T('onCpu');
-  return `${m.quant || 'Q4_K_M'} · ${gpuPart}${p.slots > 1 ? ' · ' + p.slots + ' ' + T('agentsPar') : ''} · ${T('ctx')} ${p.ctx / 1024}K · ${p.measured ? '' : '≈'}${p.speed} ${T('tps')}`;
+  const real = realSlots(m.id), n = real === null ? p.slots : real;
+  const par = n > 1 ? ` · ${real === null ? '≈' : ''}${n} ${T('agentsPar')}` : '';
+  return `${m.quant || 'Q4_K_M'} · ${gpuPart}${par} · ${T('ctx')} ${p.ctx / 1024}K · ${p.measured ? '' : '≈'}${p.speed} ${T('tps')}`;
 }
 function profile() {
   const hw = S.st.hw || {}; const v = hw.vramGB || 0;
@@ -231,12 +241,12 @@ async function appScreen() {
   P.monitor(S.st.load !== false);
 }
 function renderNav() {
-  const tabs = [['chat', 'tChat'], ['projects', 'tProjects'], ['models', 'tModels'], ['api', 'tApi'], ['design', 'tDesign'], ['opt', 'tOpt'], ['agents', 'tAgents']];
+  const tabs = [['chat', 'tChat'], ['projects', 'tProjects'], ['models', 'tModels'], ['agents', 'tAgents'], ['design', 'tDesign'], ['settings', 'tSettings']];
   const hw = S.st.hw || {}; const [pname] = profile();
   const sp = S.running && S.st.speed && S.st.speed[S.running];
   $('#nav').innerHTML = `<div class="brand"><div class="dot led"></div>PULSAR</div>
     ${tabs.map(t => `<button class="nav ${S.tab === t[0] ? 'on' : ''}" data-act="tab" data-v="${t[0]}">${T(t[1])}</button>`).join('')}
-    <div class="hist">${S.chats.length ? `<div class="histh">${T('history')}</div>` : ''}${S.chats.slice(0, 40).map(c => `<div class="hitem ${c.id === S.chatId ? 'on' : ''}" data-act="openChat" data-v="${c.id}"><span>${esc(c.title)}</span><button class="bx" data-act="delChat" data-v="${c.id}" aria-label="delete">${ico('x', 11)}</button></div>`).join('')}</div>
+    <div class="hist">${S.chats.length ? `<div class="histh">${T('history')}</div>` : ''}${S.chats.slice(0, 40).map(c => `<div class="hitem ${c.id === S.chatId ? 'on' : ''}" data-act="openChat" data-v="${c.id}" data-chat="${c.id}"><span>${esc(c.title)}</span><button class="bx" data-act="delChat" data-v="${c.id}" aria-label="delete">${ico('x', 11)}</button></div>`).join('')}</div>
     <div class="hwbox">${T('profileLbl')}: ${esc(pname)}<br><span class="mono" style="color:#ddd">${hw.vramGB ? 'GPU ' + hw.vramGB + ' ' + T('gb') + ' · ' : ''}RAM ${hw.ramGB || '?'} ${T('gb')}</span>
     ${sp ? `<br>${T('speedLbl')}: <span class="mono" style="color:#ddd">${sp} ${T('tps')}</span>` : ''}</div>
     <div class="hwbox" id="temps" style="margin-top:8px;${S.temps && (S.temps.gpu || S.temps.cpu) ? '' : 'display:none'}">${tempsHTML()}</div>
@@ -250,7 +260,7 @@ function renderMain() {
   if (!same) { m.classList.remove('swap'); void m.offsetWidth; m.classList.add('swap'); }
   m.style.padding = S.tab === 'chat' ? '48px 56px 28px' : '';
   if (S.tab === 'projects') { m.innerHTML = viewProjects(); loadProjects(); }
-  else m.innerHTML = ({ chat: viewChat, models: viewModels, opt: viewOpt, agents: viewAgents, api: viewApi, design: viewDesign }[S.tab])();
+  else m.innerHTML = ({ chat: viewChat, models: viewModels, agents: viewAgents, design: viewDesign, settings: viewSettings }[S.tab] || viewChat)();
   if (S.tab === 'chat') { hookScroll(); const box = $('#msgs'); toBottom(box); $('#input')?.focus(); showBoost(); showVision(); }
 }
 
@@ -424,34 +434,54 @@ function engineText() {
 }
 
 // ---------- optimization tab ----------
-function viewOpt() {
+// ---------- settings: one place for keys, hardware, look and updates ----------
+function optRows() {
   const o = S.st.opt || {};
   const ctxv = o.ctx && o.ctx !== 'auto' ? (+o.ctx / 1024) + 'K' : T('auto');
-  const rows = [
-    ['auto', T('oAuto'), T('oAutoD'), o.auto !== false ? T('on') : T('off')],
-    ['layers', T('oLayers'), T('oLayersD'), o.layers === 'half' ? T('half') : T('max')],
-    ['ctx', T('oCtx'), T('oCtxD'), ctxv],
-    ['threads', T('oThreads'), T('oThreadsD'), o.threads === 'all' ? `${S.st.hw?.threads || '?'}` : `${T('auto')} · ${S.st.hw?.cores || '?'}`],
-    ['load', T('oLoad'), T('oLoadD'), S.st.load !== false ? T('on') : T('off')],
-    ['heat', T('oHeat'), T('oHeatD'), S.st.heat !== false ? T('on') : T('off')],
-    ['heatGpu', T('oHeatGpu'), T('oHeatGpuD'), `${S.st.gpuLimit || 75}°C`],
-    ['heatCpu', T('oHeatCpu'), T('oHeatCpuD'), `${S.st.cpuLimit || 75}°C`],
-    ['engine', T('oEngine'), T('oEngineD'), S.st.engine === 'cpu' ? 'CPU' : 'Vulkan'],
-    ['sound', T('oSound'), T('oSoundD'), S.st.sound !== false ? T('on') : T('off')],
-    ['tts', T('oTts'), T('oTtsD'), S.st.tts ? T('on') : T('off')],
-    ['theme', T('oTheme'), T('oThemeD'), S.st.theme === 'light' ? T('light') : T('dark')],
-    ['tray', T('oTray'), T('oTrayD'), S.st.tray !== false ? T('on') : T('off')],
-    ['memory', T('oMemory'), T('oMemoryD'), (S.st.memory || []).length ? `${(S.st.memory || []).length} · ${T('clear')}` : '—'],
-    ['spec', T('oSpec'), T('oSpecD'), S.st.spec !== false ? T('on') : T('off')],
-    ['trusted', T('oTrusted'), T('oTrustedD'), (S.st.trustedHosts || []).length ? `${(S.st.trustedHosts || []).length} · ${T('clear')}` : '—'],
-    ['lang', T('oLang'), '', L() === 'ru' ? 'Русский' : 'English']
-  ];
-  return `<h2 class="fu">${T('tOpt')}</h2><p class="sub fu" style="animation-delay:.08s">${T('optSub')}</p>
-  <div style="max-width:660px;display:flex;flex-direction:column;gap:12px">
-  ${rows.map((r, i) => `<button class="card fu" data-act="opt" data-v="${r[0]}" style="animation-delay:${.12 + i * .05}s;flex-direction:row;justify-content:space-between;align-items:center;padding:18px 22px;border-radius:16px">
-    <span style="display:flex;flex-direction:column;gap:4px"><span style="font-size:17px;font-weight:400">${r[1]}</span>${r[2] ? `<span class="small muted">${r[2]}</span>` : ''}</span>
-    <span class="mono small" style="white-space:nowrap">${r[3]}</span></button>`).join('')}
-  <div class="fu" style="animation-delay:.6s;display:flex;gap:12px;margin-top:12px"><button class="btn ghost sm" data-act="rescan">${T('rescan')}</button><button class="btn ghost sm" data-act="folder">${T('openFolder')}</button><button class="btn ghost sm" data-act="report">${T('reportBtn')}</button></div></div>`;
+  return {
+    perf: [
+      ['auto', T('oAuto'), T('oAutoD'), o.auto !== false ? T('on') : T('off')],
+      ['layers', T('oLayers'), T('oLayersD'), o.layers === 'half' ? T('half') : T('max')],
+      ['ctx', T('oCtx'), T('oCtxD'), ctxv],
+      ['threads', T('oThreads'), T('oThreadsD'), o.threads === 'all' ? `${S.st.hw?.threads || '?'}` : `${T('auto')} · ${S.st.hw?.cores || '?'}`],
+      ['engine', T('oEngine'), T('oEngineD'), S.st.engine === 'cpu' ? 'CPU' : 'Vulkan'],
+      ['spec', T('oSpec'), T('oSpecD'), S.st.spec !== false ? T('on') : T('off')],
+      ['load', T('oLoad'), T('oLoadD'), S.st.load !== false ? T('on') : T('off')]
+    ],
+    heat: [
+      ['heat', T('oHeat'), T('oHeatD'), S.st.heat !== false ? T('on') : T('off')],
+      ['heatGpu', T('oHeatGpu'), T('oHeatGpuD'), `${S.st.gpuLimit || 75}°C`],
+      ['heatCpu', T('oHeatCpu'), T('oHeatCpuD'), `${S.st.cpuLimit || 75}°C`]
+    ],
+    general: [
+      ['lang', T('oLang'), '', L() === 'ru' ? 'Русский' : 'English'],
+      ['theme', T('setTheme'), T('setThemeD'), S.st.theme === 'light' ? T('themeLight') : T('themeDark')],
+      ['ws', T('setWs'), T('setWsD'), S.ws || '—'],
+      ['sound', T('oSound'), T('oSoundD'), S.st.sound !== false ? T('on') : T('off')],
+      ['tray', T('oTray'), T('oTrayD'), S.st.tray !== false ? T('on') : T('off')],
+      ['memory', T('oMemory'), T('oMemoryD'), (S.st.memory || []).length ? `${(S.st.memory || []).length} · ${T('clear')}` : '—'],
+      ['trusted', T('oTrusted'), T('oTrustedD'), (S.st.trustedHosts || []).length ? `${(S.st.trustedHosts || []).length} · ${T('clear')}` : '—']
+    ]
+  };
+}
+const setRow = (r, i) => `<button class="card fu" data-act="opt" data-v="${r[0]}" style="animation-delay:${.1 + i * .04}s;flex-direction:row;justify-content:space-between;align-items:center;padding:18px 22px;border-radius:16px;gap:18px">
+    <span style="display:flex;flex-direction:column;gap:4px;min-width:0"><span style="font-size:17px;font-weight:400">${r[1]}</span>${r[2] ? `<span class="small muted">${r[2]}</span>` : ''}</span>
+    <span class="mono small setval">${esc(String(r[3]))}</span></button>`;
+function viewSettings() {
+  const g = optRows(); let n = 0;
+  const group = (title, rows) => `<div class="sec fu" style="animation-delay:${.08 + n * .01}s">${title}</div>
+    <div class="setgrp">${rows.map(r => setRow(r, n++)).join('')}</div>`;
+  return `<h2 class="fu">${T('tSettings')}</h2><p class="sub fu" style="animation-delay:.08s">${T('setSub')}</p>
+  <div class="setwrap">
+    <div class="sec fu">${T('setApi')}</div>
+    <div class="setgrp">${apiPanel()}</div>
+    ${group(T('setPerf'), g.perf)}
+    ${group(T('setHeat'), g.heat)}
+    ${group(T('setGeneral'), g.general)}
+    <div class="sec fu">${T('setUpd')}</div>
+    <div class="fu" style="display:flex;gap:12px;flex-wrap:wrap"><button class="btn ghost sm" data-act="checkUpd">${T('updCheck')}</button><button class="btn ghost sm" data-act="rescan">${T('rescan')}</button><button class="btn ghost sm" data-act="folder">${T('openFolder')}</button><button class="btn ghost sm" data-act="report">${T('reportBtn')}</button></div>
+    <div class="muted small fu" style="margin-top:10px">PULSAR ${S.version || ''}</div>
+  </div>`;
 }
 async function toggleOpt(k) {
   const o = { ...(S.st.opt || {}) };
@@ -462,10 +492,10 @@ async function toggleOpt(k) {
   if (k === 'load') { await save({ load: S.st.load === false }); P.monitor(S.st.load !== false); }
   if (k === 'engine') await save({ engine: S.st.engine === 'cpu' ? 'vulkan' : 'cpu' });
   if (k === 'sound') await save({ sound: S.st.sound === false });
-  if (k === 'tts') { await save({ tts: !S.st.tts }); if (!S.st.tts) speechSynthesis.cancel(); }
   if (k === 'theme') { await save({ theme: S.st.theme === 'light' ? 'dark' : 'light' }); applyTheme(); }
   if (k === 'tray') await save({ tray: S.st.tray === false });
   if (k === 'trusted') await save({ trustedHosts: [] });
+  if (k === 'ws') { S.ws = await P.ws.choose(); Sound.tick(1500); renderMain(); return; }
   if (k === 'memory') await save({ memory: [] });
   if (k === 'spec') await save({ spec: S.st.spec === false });
   if (k === 'heatGpu' || k === 'heatCpu') { const key = k === 'heatGpu' ? 'gpuLimit' : 'cpuLimit', seq = [65, 70, 75, 80, 85, 90]; await save({ [key]: seq[(seq.indexOf(S.st[key] || 75) + 1) % seq.length] }); Sound.tick(1500); renderMain(); return; }
@@ -489,40 +519,46 @@ function viewAgents() {
     <span class="mono" style="font-size:12px">${cur === a[0] ? '● ' + T('chosen') : '○'}</span></button>`).join('')}</div>`;
 }
 
-// ---------- custom APIs ----------
-function viewApi() {
+// ---------- APIs: paste a key, give it a name, done ----------
+// Picking models by hand is gone: the key is checked, every model it offers is connected at once,
+// and which one answers is chosen in the chat.
+const GOOD_API = /gpt-5|gpt-4\.1|claude-(opus|sonnet)|gemini-[23]\.\d-(pro|flash)|grok-[34]|deepseek-(chat|v3)|qwen3\.5|llama-4|kimi-k2|glm-4\.\d|mistral-large/i;
+const pickDefaultModel = models => {
+  const ids = models.map(m => m.id);
+  return ids.find(id => GOOD_API.test(id)) || ids.find(id => !/free|preview|experimental|tiny|nano|embed/i.test(id)) || ids[0];
+};
+function apiPanel() {
   const apis = S.st.apis || [], c = S.apiCheck || {};
   const status = c.state === 'work' ? `<div class="apist"><span class="dot led"></span><span class="shimmer">${T('apiChecking')}</span></div>`
-    : c.state === 'err' ? `<div class="apist err">${ico('x', 13)}<span>${esc(c.error)}</span></div>`
-    : c.state === 'ok' ? `<div class="apist ok">${ico('check', 13)}<span>${T('apiKeyOk')(c.provider, c.models.length)}</span></div>` : '';
-  const pick = c.state === 'ok' ? `<div class="apipick fu"><input id="aQ" class="mono" placeholder="${T('apiSearch')}" value="${esc(c.q || '')}" autocomplete="off"><div id="aList" class="alist">${apiModelList()}</div></div>` : '';
-  return `<h2 class="fu">API</h2><p class="sub fu" style="animation-delay:.08s">${T('apiSub2')}</p>
-  <div class="fu" style="animation-delay:.14s;max-width:640px;display:flex;flex-direction:column;gap:14px">
+    : c.state === 'err' ? `<div class="apist err">${ico('x', 13)}<span>${esc(c.error)}</span></div>` : '';
+  return `<div class="fu" style="display:flex;flex-direction:column;gap:14px">
+    <div class="muted small">${T('apiSub3')}</div>
     <label class="field">${T('apiKey')}<input id="aKey" type="text" spellcheck="false" class="mono" placeholder="sk-… · gsk_… · AIza… · sk-ant-… · sk-or-…" value="${esc(c.key || '')}" autocomplete="off"></label>
     <label class="field">${T('apiName')}<input id="aName" class="mono" placeholder="${T('apiNamePh')}" value="${esc(S.apiName || '')}" autocomplete="off"></label>
-    ${status}${pick}
-    <div class="sec" style="margin-top:26px">${T('apiConnected')} · ${apis.length}</div>
+    ${status}
+    <div class="sec" style="margin-top:8px">${T('apiConnected')} · ${apis.length}</div>
     ${apis.length ? apis.map((a, i) => `<div class="card apicard fu" style="animation-delay:${.05 * i}s">
-      <div class="row"><span style="display:flex;flex-direction:column;gap:4px"><span style="font-size:18px;font-weight:400">${esc(a.name)}</span><span class="mono small muted">${esc(a.model)} · ••••${esc((a.key || '').slice(-4))}</span></span>
+      <div class="row"><span style="display:flex;flex-direction:column;gap:4px"><span style="font-size:18px;font-weight:400">${esc(a.name)}</span><span class="mono small muted">${T('apiModelsN')((a.models || [a.model]).length)} · ${T('apiNow')}: ${esc(a.model)} · ••••${esc((a.key || '').slice(-4))}</span></span>
       <span style="display:flex;align-items:center;gap:12px"><span class="mono small apiok">● ${a.err ? esc(a.err) : T('apiOn')}</span><button class="btn ghost sm" data-act="apiDel" data-v="${i}">${T('del')}</button></span></div></div>`).join('')
       : `<div class="muted small">${T('apiNone')}</div>`}
   </div>`;
 }
 async function apiCheckNow() {
   const key = ($('#aKey')?.value || '').trim();
-  S.apiCheck = { state: 'work', key, url0: '' }; S._lastTab = 'api'; renderMain(); Sound.soft();
+  if (!key) return;
+  const nm = ($('#aName')?.value || '').trim();
+  S.apiCheck = { state: 'work', key }; S._lastTab = 'settings'; renderMain(); Sound.soft();
   const r = await P.apiCheck(key, '').catch(e => ({ ok: false, error: String(e.message || e) }));
-  S.apiCheck = r.ok ? { state: 'ok', key, url0: '', provider: r.provider, url: r.url, kind: r.kind, models: r.models, q: '' } : { state: 'err', key, url0: '', error: r.error };
-  r.ok ? Sound.done() : Sound.tick(700); renderMain(); setTimeout(() => $('#aQ')?.focus(), 50);
-}
-function apiModelList() {
-  const c = S.apiCheck; if (!c || !c.models) return '';
-  const q = (c.q || '').toLowerCase().trim();
-  const l = c.models.filter(m => !q || m.id.toLowerCase().includes(q) || String(m.name).toLowerCase().includes(q)).slice(0, 80);
-  const have = new Set((S.st.apis || []).filter(a => a.url === c.url && a.key === c.key).map(a => a.model));
-  return l.length ? l.map(m => `<button class="arow ${have.has(m.id) ? 'on' : ''}" data-act="apiPick" data-v="${esc(m.id)}" ${c.pinging ? 'disabled' : ''}>
-      <span class="mono">${esc(m.id)}</span><span class="small muted">${c.pinging === m.id ? `<span class="shimmer">${T('apiPinging')}</span>` : have.has(m.id) ? T('apiOn') : m.free ? T('apiFree') : ''}</span></button>`).join('')
-    : `<div class="muted small" style="padding:12px">${T('apiNoMatch')}</div>`;
+  if (!r.ok) { S.apiCheck = { state: 'err', key, error: r.error }; Sound.tick(700); renderMain(); return; }
+  const model = pickDefaultModel(r.models);
+  const entry = { name: nm || r.provider, url: r.url, key, kind: r.kind, model, models: r.models.map(m => m.id) };
+  const same = (S.st.apis || []).findIndex(a => a.url === entry.url && a.key === entry.key);
+  const list = [...(S.st.apis || [])];
+  same >= 0 ? list[same] = { ...list[same], ...entry } : list.push(entry);
+  await save({ apis: list });
+  S.apiCheck = {}; S.apiName = '';
+  toast(T('apiAddedAll')(entry.name, entry.models.length)); Sound.done();
+  S._lastTab = 'settings'; renderMain();
 }
 // ---------- design ----------
 function viewDesign() {
@@ -551,16 +587,35 @@ async function loadProjects() {
   box.innerHTML = S.projects.length ? S.projects.map((p, i) => `<div class="card fu" style="animation-delay:${.08 + i * .04}s;cursor:default">
       <div class="row"><span style="font-size:20px;font-weight:400">${esc(p.title || p.dir)}</span><span class="mono small muted">${p.updated ? new Date(p.updated).toLocaleDateString() : ''}</span></div>
       <div class="mono small muted">${esc(p.dir)}/ · ${p.files.length} ${T('filesN')}</div>
-      <div class="row" style="justify-content:flex-start;gap:6px;flex-wrap:wrap"><button class="cb pri" data-act="projOpen" data-v="${esc(p.files[0])}">${T('open')}</button><button class="cb" data-act="projEdit" data-v="${esc(p.files[0])}">${T('editor')}</button><button class="cb" data-act="projGo" data-v="${esc(p.dir)}">${T('projContinue')}</button><button class="cb" data-act="projFolder" data-v="${esc(p.dir)}">${T('folder')}</button></div></div>`).join('')
+      <div class="row" style="justify-content:flex-start;gap:6px;flex-wrap:wrap"><button class="cb pri" data-act="projOpen" data-v="${esc(p.files[0])}">${T('open')}</button><button class="cb" data-act="projEdit" data-v="${esc(p.files[0])}">${T('editor')}</button><button class="cb" data-act="projGo" data-v="${esc(p.dir)}">${T('projContinue')}</button><button class="cb" data-act="projFolder" data-v="${esc(p.dir)}">${T('folder')}</button><button class="cb danger" data-act="projDel" data-v="${esc(p.dir)}">${T('projDel')}</button></div></div>`).join('')
     : `<div class="muted fu">${T('projEmpty')}</div>`;
 }
 function viewProjects() {
   return `<h2 class="fu">${T('tProjects')}</h2><p class="sub fu" style="animation-delay:.08s">${T('projSub')}</p><div class="grid" id="projlist"></div>`;
 }
-async function rememberProject(dir, files, title) {
+async function deleteProject(dir) {
+  const p = (S.projects || []).find(x => x.dir === dir) || { dir, title: dir };
+  const n = await P.ws.count(dir);
+  if (!confirm(T('projDelAsk')(p.title || dir, n))) return;
+  const r = await P.ws.trash(dir);
+  if (!r.ok) { toast(T('projDelErr') + ': ' + (r.error || '')); return; }
+  await save({ projects: (S.st.projects || []).filter(x => x.dir !== dir) });
+  if (S.lastProject && S.lastProject.dir === dir) S.lastProject = null;
+  toast(T('projDeleted')(p.title || dir));
+  loadProjects();
+}
+async function rememberProject(dir, files, title, note) {
   const list = (S.st.projects || []).filter(p => p.dir !== dir);
   list.unshift({ dir, files, title: title || dir, updated: Date.now() });
-  await save({ projects: list.slice(0, 200) });
+  const patch = { projects: list.slice(0, 200) };
+  // one line about what this project is, so the next message about it starts with context
+  if (note) {
+    const notes = { ...(S.st.projectNotes || {}) };
+    notes[dir] = String(note).replace(/\s+/g, ' ').slice(0, 400);
+    const keep = Object.fromEntries(Object.entries(notes).filter(([d]) => patch.projects.some(p => p.dir === d)));
+    patch.projectNotes = keep;
+  }
+  await save(patch);
 }
 
 // ---------- chat ----------
@@ -661,9 +716,14 @@ function viewChat() {
   const opts = `${ourAgents().map(a => `<option value="${a[0]}" ${cur === a[0] ? 'selected' : ''}>${a[1]}</option>`).join('')}`;
   const auto = S.st.autoAgent !== false;
   const srcSel = src.length < 2 ? '' : `<select class="pick" data-act="sel">${src.map(s => `<option value="${s[0]}" ${S.sel === s[0] ? 'selected' : ''}>${esc(s[1])}</option>`).join('')}</select>`;
+  // every model of the chosen API is already connected — this is where you pick which one answers
+  const ai = (isApi(S.sel) || isTog(S.sel)) ? +String(S.sel).split(':')[1] : -1;
+  const ap = ai >= 0 ? (S.st.apis || [])[ai] : null;
+  const modSel = ap && (ap.models || []).length > 1
+    ? `<select class="pick mono" data-act="apiModelSel" data-v="${ai}" title="${T('apiPickModel')}">${ap.models.map(m => `<option value="${esc(m)}" ${ap.model === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select>` : '';
   const head = `<div class="row fu" style="margin-bottom:12px;gap:8px">
     <div class="chips"><button class="tgl ${auto ? 'on' : ''}" data-act="autoAgent" title="${T('autoAgentD')}"><span class="knob"></span>${T('autoModel')}</button>
-      ${auto ? `<span class="pill" id="apill">${esc(S.lastAgent || T('autoAgentPick'))}</span>` : `<select class="pick" data-act="agentSel">${opts}</select>`}${srcSel}<span class="pill boost" id="bpill" style="display:none"></span><span class="pill vis" id="vpill" style="display:none"></span><span class="pill mono" id="spill" style="${speedText() ? '' : 'display:none'}">${esc(speedText())}</span><span id="estatus">${S.engine && S.engine.stage !== 'ready' ? engineText() : ''}</span></div>
+      ${auto ? `<span class="pill" id="apill">${esc(S.lastAgent || T('autoAgentPick'))}</span>` : `<select class="pick" data-act="agentSel">${opts}</select>`}${srcSel}${modSel}<span class="pill boost" id="bpill" style="display:none"></span><span class="pill vis" id="vpill" style="display:none"></span><span class="pill mono" id="spill" style="${speedText() ? '' : 'display:none'}">${esc(speedText())}</span><span id="estatus">${S.engine && S.engine.stage !== 'ready' ? engineText() : ''}</span></div>
     <div class="chips">
       <button class="ibtn" data-act="wsOpen" title="${T('folder')}: ${esc(S.ws || '')}">${ico('folder')}</button>
       <button class="ibtn ${S.panel ? 'on' : ''}" data-act="panel" title="${T('browser')}">${ico('globe')}</button>
@@ -675,7 +735,7 @@ function viewChat() {
   return `<div class="chat">${head}<div class="msgs" id="msgs">${S.msgs.length ? S.msgs.map(msgHTML).join('') : empty}</div>
     <button class="jump" id="jump" data-act="jump" aria-label="down"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></button>
     <div class="attachrow" id="attachrow"></div>
-    <div class="composer fu" style="animation-delay:.15s"><button class="ib attachb" data-act="attach" title="${T('attachT')}" aria-label="attach"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5 12.5 20a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg></button> <button class="ib micb" id="micb" data-act="mic" title="${T('micT')}" aria-label="mic">${ico('mic', 17)}</button><textarea id="input" rows="1" placeholder="${src.length ? T('placeholder') : T('chatNoModel')}"></textarea>
+    <div class="composer fu" style="animation-delay:.15s"><button class="ib attachb" data-act="attach" title="${T('attachT')}" aria-label="attach"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5 12.5 20a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg></button><textarea id="input" rows="1" placeholder="${src.length ? T('placeholder') : T('chatNoModel')}"></textarea>
     <button class="send" data-act="${S.streaming ? 'stop' : 'send'}" aria-label="send">${sendIcon()}</button></div></div>`;
 }
 const sendIcon = () => S.streaming ? '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect width="14" height="14" rx="3" fill="currentColor"/></svg>'
@@ -861,6 +921,39 @@ function loopCut(t) {
 const noThink = s => s.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim();
 const REFUSAL = /(не (имею|могу|умею)[^.\n]{0,80}(доступ|сохран|открыва|браузер|файл|компьютер|пк|интернет))|(у меня нет[^.\n]{0,40}(доступ|браузер))|(я (всего лишь|лишь|только)? ?текстов)|(I (can't|cannot|don't|do not)[^.\n]{0,80}(access|save|open|browse|file|computer|internet))|(text-based (AI|assistant))/i;
 // old action results and action blocks are dropped, so the model never redoes earlier requests
+// ---------- context budget ----------
+// The model's window is finite and llama-server does not shift it: it answers with an error
+// when the request does not fit. One coder reply can be a whole HTML file, so cutting the
+// history by message count alone overflowed the window after a few turns.
+const CHARS_PER_TOKEN = 3.2;
+function historyBudget() {
+  if (onlyCloud()) return 200000;
+  const ctx = (S.runPlan && S.runPlan.ctx) || 4096;
+  // the rest of the window goes to the system prompt, the tools and the answer itself
+  return Math.max(2500, Math.floor(ctx * CHARS_PER_TOKEN * 0.5));
+}
+// a cheap local digest of what got cut — no extra model call, so no extra wait
+function digest(cut) {
+  const first = cut.find(m => m.role === 'user' && (m.content || '').trim());
+  const files = [...new Set(cut.flatMap(m => [...String(m.content || '').matchAll(/```file:([^\n`]+)/g)].map(x => x[1].trim())))];
+  const bits = [];
+  if (first) bits.push(`${T('digTask')}: ${String(first.content).replace(/\s+/g, ' ').slice(0, 300)}`);
+  if (files.length) bits.push(`${T('digFiles')}: ${files.slice(0, 20).join(', ')}`);
+  return bits.length ? { role: 'user', content: `[${T('digHead')}]\n${bits.join('\n')}` } : null;
+}
+// keeps the newest messages that fit the window; the last user message is always kept whole
+function fitHistory(list) {
+  const budget = historyBudget();
+  const keep = []; let used = 0, i = list.length - 1;
+  for (; i >= 0; i--) {
+    const n = (list[i].content || '').length + 40;
+    if (keep.length && used + n > budget) break;
+    keep.unshift(list[i]); used += n;
+  }
+  if (i < 0) return keep;
+  const d = digest(list.slice(0, i + 1));
+  return d ? [d, ...keep] : keep;
+}
 function toApi(list) {
   const out = []; let lastUser = -1;
   list.forEach((m, k) => { if (m.role === 'user') lastUser = k; });
@@ -887,6 +980,7 @@ function parseActions(text) {
   return out;
 }
 S.pending = {};
+S.readFiles = new Set(); // files the agent has read during the current task
 const stoppedNow = () => !!(S.streaming && S.streaming.signal && S.streaming.signal.aborted);
 function ask(a) { if (stoppedNow()) return Promise.resolve(false); return new Promise(r => { S.pending[a.id] = r; }); }
 async function doSearch(q) {
@@ -908,13 +1002,22 @@ async function askSite(msg, idx, url, label) {
   msg.ask = null; paint(idx); if (ok) (S.allowedHosts ||= new Set()).add(hostOf(url));
   return ok;
 }
+// a full Windows path ("C:\Users\...") or a UNC share — read-only territory outside the workspace
+const isAbs = p => /^[a-z]:[\\/]/i.test(String(p || '')) || /^\\\\/.test(String(p || ''));
 async function execAction(a, repaint, auto) {
   a.state = 'work'; repaint();
   try {
     let res;
     if (a.kind === 'file') {
+      // Overwriting a file the agent has not read means rewriting it from memory — that is how
+      // working code used to disappear. Make it read the file first; new files are unaffected.
+      if (isAbs(a.arg)) { a.state = 'denied'; repaint(); return `${a.arg} is outside the projects folder. You may read anywhere, but you may only create and change files inside the projects folder. Tell the user the path instead.`; }
+      if (!auto && !S.readFiles.has(a.arg)) {
+        let exists = false; try { await P.ws.read(a.arg); exists = true; } catch (e) {}
+        if (exists) { a.state = 'done'; repaint(); S.readFiles.add(a.arg); return `${a.arg} already exists and you have not read it in this task. Read it first with \`\`\`read:${a.arg}\`\`\`, then save the full new version. Do not write it from memory.`; }
+      }
       if (/\.html?$/i.test(a.arg) && designOn() && DESIGN.uses(a.body)) a.body = DESIGN.apply(a.body, designTheme());
-      await P.ws.write(a.arg, a.body); res = `File saved: ${a.arg}`;
+      await P.ws.write(a.arg, a.body); S.readFiles.add(a.arg); res = `File saved: ${a.arg}`;
       if (S.editFile === a.arg && ED) ED.set(a.body, a.arg);
       const lang = (a.arg.split('.').pop() || '').toLowerCase();
       if (/^(html?|py|js)$/.test(lang)) { const errs = await autoCheck({ lang: lang.startsWith('htm') ? 'html' : lang, code: a.body }, lang.startsWith('htm')); if (errs.length) { a.warn = errs.length; res += `\nPULSAR checked it and found problems — fix them and save the file again:\n- ${errs.join('\n- ')}`; } }
@@ -928,8 +1031,15 @@ async function execAction(a, repaint, auto) {
     }
     else if (a.kind === 'mkdir') { await P.ws.mkdir(a.arg); res = `Folder created: ${a.arg}`; }
     else if (a.kind === 'move') { const [f, t] = a.arg.split('|').map(x => x.trim()); if (!f || !t) throw new Error('use move:old|new'); await P.ws.move(f, t); res = `Moved ${f} → ${t}`; }
-    else if (a.kind === 'read') res = `Content of ${a.arg}:\n${(await P.ws.read(a.arg)).slice(0, 8000)}`;
-    else if (a.kind === 'list') { const l = await P.ws.list(a.arg || '.'); res = `Folder ${a.arg || '.'}:\n${l.join('\n') || '(empty)'}`; }
+    else if (a.kind === 'read') {
+      S.readFiles.add(a.arg);
+      const text = isAbs(a.arg) ? await P.pc.read(a.arg) : (await P.ws.read(a.arg)).slice(0, 8000);
+      res = `Content of ${a.arg}:\n${text}`;
+    }
+    else if (a.kind === 'list') {
+      const l = isAbs(a.arg) ? await P.pc.list(a.arg) : await P.ws.list(a.arg || '.');
+      res = `Folder ${a.arg || '.'}:\n${l.join('\n') || '(empty)'}`;
+    }
     else if (a.kind === 'open') {
       const u = /^https?:\/\//i.test(a.arg) ? a.arg : 'https://' + a.arg;
       if (!auto && !(await askSiteAction(a, u, repaint))) { a.state = 'denied'; repaint(); return `open:${u} — the user did not allow visiting this site.`; }
@@ -1201,7 +1311,22 @@ const FEWSHOT = {
 const memText = () => (S.st.memory || []).length ? `\nWhat you know about the user from earlier chats (use it naturally, do not list it):\n${S.st.memory.map(x => '- ' + x).join('\n')}` : '';
 const MEM_RULE = '\nIf the user tells you something lasting about themselves (name, city, work, projects, what they like or want from you), put at the very end of your reply one line per fact: [[remember: short fact]]. If they ask to forget something: [[forget: the fact]]. Never mention these lines.';
 const ONLY_LAST = '\nDo ONLY what the LAST user message asks. Earlier messages are just context: never repeat earlier searches, sites or tasks unless the last message asks for it again. When the task is done, give the answer and stop.';
-const sysMsg = (prompt, tools, mem) => ({ role: 'system', content: prompt + ONLY_LAST + (tools ? '\n' + TOOLS_PROMPT : '') + (mem ? MEM_RULE : '') + memText() + `\nWorkspace folder: ${S.ws || ''}` });
+// ---------- project memory ----------
+// Tool agents used to be told only the path of the workspace, so on the second message about the
+// same site they had no idea what was already in it and rewrote everything from scratch.
+const EDIT_RULE = '\nBefore you change a file that already exists, read it first with ```read:path``` and keep everything the user did not ask you to change. Never rewrite an existing file from memory.';
+const ASK_RULE = '\nIf the task is genuinely ambiguous and a wrong guess would waste the work, ask ONE short question and stop. Do not ask about things you can simply check with read: or list:.';
+function projectText() {
+  const p = S.lastProject;
+  if (!p || !p.dir) return '';
+  const files = (p.files || []).slice(0, 40).join(', ');
+  const notes = (S.st.projectNotes || {})[p.dir];
+  return `\nCurrent project: ${p.dir}/${p.title && p.title !== p.dir ? ` ("${p.title}")` : ''}`
+    + (files ? `\nIts files: ${files}` : '')
+    + (notes ? `\nWhat was decided about it earlier: ${notes}` : '')
+    + '\nWhen the user says "the site", "it" or "this project" without naming anything, they mean this one. Work inside this folder, do not start a new one.';
+}
+const sysMsg = (prompt, tools, mem) => ({ role: 'system', content: prompt + ONLY_LAST + (tools ? '\n' + TOOLS_PROMPT + EDIT_RULE + ASK_RULE : '') + (mem ? MEM_RULE : '') + memText() + (tools ? projectText() : '') + `\nWorkspace folder: ${S.ws || ''}` });
 const MEM_RE = /\[\[\s*(remember|forget|запомни|забудь)\s*:\s*([^\]]+?)\s*\]\]/gi;
 const stripMem = s => (s || '').replace(MEM_RE, '').replace(/\[\[[^\]]*\]?$/, '').trimEnd();
 const NAME_RE = /(?:меня зовут|моё имя|мое имя|зови меня|my name is|call me)\s+([A-Za-zА-Яа-яЁё-]{2,20})|меня\s+([A-Za-zА-Яа-яЁё-]{2,20})\s+зовут/i;
@@ -1222,14 +1347,30 @@ async function applyMemory(msg) {
 const fewshot = () => FEWSHOT[L()].map(([role, content]) => ({ role, content }));
 const PAGE_ACT_RE = /(нажми|кликни|клик|тыкни|введи|впиши|заполни|прокрути|пролистай|листай|вернись назад|назад на|на (этой |открытой )?странице|на (этом )?сайте|залогин|войди в|авторизу|выбери в|click|press|type in|fill|scroll|go back|on (this|the) page)/i;
 const FOLLOW_RE = /^(а теперь |теперь )?(добавь|исправь|переделай|измени|поменяй|убери|улучши|доработай|почини|допиши|add |fix |change |remove |improve )/i;
+// A question ABOUT something is not a request to DO it. "What is recursion" used to go to the
+// coder, which then started creating files; now it goes to plain chat.
+// NB: \b only knows [A-Za-z0-9_], so after a Cyrillic word it never matches — use a lookahead.
+const EXPLAIN_RE = /^\s*(что (такое|значит|за)|как работает|как устроен|почему|зачем|чем отличается|в чём(,| )?(разница|смысл)|объясни|расскажи|стоит ли|правда ли|какой лучше|что лучше|what is|what are|what does|how does|why|explain|tell me about|should i|which is better|difference between)(?![\wа-яё])/i;
+const DO_RE = /(сделай|создай|напиши|сверстай|собери|построй|исправь|почини|перепиши|добавь|убери|запусти|открой|найди|проверь|сохрани|переимен|перемест|разлож|удали|make|create|write|build|fix|add|remove|run|open|find|check|save|rename|move|delete)/i;
+const WEB_RE = /(найди|поищи|загугли|новост|курс (доллар|евро|валют|рубл|биткоин)|погод|в интернете|в сети|актуальн|сегодня|узнай|цен[аы] на|search|find|look up|news|weather|price of)/i;
+const FILES_RE = /(файл|папк|переимен|перемест|разлож|отсортир|сортир|документ|дубликат|рабоч\w* папк|folder|file|rename|move|organi[sz]e|sort)/i;
+const CODE_RE = /(код|программ|скрипт|сайт|html|css|python|питон|javascript|\bjs\b|функци|верстк|лендинг|code|script|website|landing|function)/i;
+const BROKEN_RE = /(ошибк|баг|не работает|падает|вылетает|bug|error|crash|not working|broken)/i;
 function pickAgent(t) {
-  const def = id => { const a = ourAgents().find(x => x[0] === id); return { id: a[0], name: a[1], prompt: a[3], tools: a[4] }; };
-  if (PAGE_ACT_RE.test(t) && B.tabs.some(x => x.url !== START)) return def('browser');
-  if (FOLLOW_RE.test(t.trim()) && S.lastAgentId === 'coder' && t.length < 160) return def('coder');
-  const build = BUILD_RE.test(t) || /(код|программ|скрипт|сайт|html|python|питон|ошибк|баг|code|bug)/i.test(t);
-  if (!build && (openIntent(t) || /(найди|поищи|загугли|новост|курс (доллар|евро|валют|рубл|биткоин)|погод|в интернете|в сети|актуальн|сегодня|узнай|цен[аы] на|search|find|look up|news|weather|price of)/i.test(t))) return def('browser');
-  if (!build && /(файл|папк|переимен|перемест|разлож|отсортир|сортир|документ|дубликат|рабоч\w* папк|folder|file|rename|move|organi[sz]e|sort)/i.test(t)) return def('files');
-  if (build) return def('coder');
+  const def = id => { const a = ourAgents().find(x => x[0] === id) || ourAgents()[0]; return { id: a[0], name: a[1], prompt: a[3], tools: a[4] }; };
+  const s = t.trim();
+  // acting on a page that is already open always belongs to the browser agent
+  if (PAGE_ACT_RE.test(s) && B.tabs.some(x => x.url !== START)) return def('browser');
+  // a short follow-up stays with whoever did the previous step, whichever agent that was
+  if (FOLLOW_RE.test(s) && S.lastAgentId && s.length < 160) return def(S.lastAgentId);
+  const asking = EXPLAIN_RE.test(s) && !DO_RE.test(s);
+  if (asking) return def(WEB_RE.test(s) || openIntent(s) ? 'browser' : 'chat');
+  // explicit web or file intent wins over a stray mention of code
+  if (openIntent(s) || WEB_RE.test(s)) return def('browser');
+  if (FILES_RE.test(s) && !BUILD_RE.test(s)) return def('files');
+  // "it is broken" only means the coder when there is something of ours to fix
+  if (BUILD_RE.test(s) || CODE_RE.test(s)) return def('coder');
+  if (BROKEN_RE.test(s) && S.lastProject) return def('coder');
   return def('chat');
 }
 function curAgentDef() {
@@ -1341,7 +1482,7 @@ async function runAgent(ag, userText, signal) {
   for (let round = 0; round < (ag.id === 'browser' ? 10 : 6); round++) {
     if (S.temps?.hot && !onlyCloud()) { const w = { role: 'assistant', content: '', live: true, status: T('cooling') }; S.msgs.push(w); const wi = S.msgs.length - 1; addMsg(wi); await cool(signal); S.msgs.splice(wi, 1); root.querySelector(`.msg[data-i="${wi}"]`)?.remove(); }
     if (round === 0 && ag.id === 'files') { let l = []; try { l = await P.ws.list('.'); } catch (e) {} S.msgs.push({ role: 'tool', content: `Workspace files (${l.length}):\n${l.join('\n') || '(empty)'}` }); addMsg(S.msgs.length - 1); }
-    const history = toApi(S.msgs.slice(-24));
+    const history = fitHistory(toApi(S.msgs.slice(-24)));
     const msg = { role: 'assistant', content: '', live: true, agent: round === 0 ? ag.name : null }; S.msgs.push(msg); const idx = S.msgs.length - 1; addMsg(idx);
     try {
       const meta = {};
@@ -1540,7 +1681,7 @@ async function runChain(text, signal, plan) {
   const nav = pages.map(x => `${x.file} (${x.title || ''})`).join(', ');
   stage('code');
   const jobs = pages.map((pg, k) => part(coder[1] + (pages.length > 1 ? ' #' + (k + 1) : ''), plan.site ? `${pg.file}${pg.title ? ' — ' + pg.title : ''}` : T('chCode'), 'wait'));
-  const slots = () => onlyCloud() ? 3 : S.temps?.hot ? 1 : Math.max(1, S.slots || 1);
+  const slots = () => realSlots(S.running) || 1; // one source of truth, same number the model card shows
   const codes = await limitAll(pages, slots(), async (pg, k) => {
     await waitCool();
     const p = jobs[k]; p.status = 'work'; paint(idx);
@@ -1579,23 +1720,27 @@ async function runChain(text, signal, plan) {
     await waitCool();
     const label = plan.site ? pages[k].file : T('chCode');
     const p = part(coder[1] + ' · ' + T('chReview') + (pages.length > 1 ? ' #' + (k + 1) : ''), label);
-    let cur = c, fixedAny = false;
-    for (let round = 0; round < 3; round++) {
-      const problems = await autoCheck(cur, plan.site);
-      if (!problems.length) break;
+    // The reviewer used to be told to fix "anything else that is broken", ran three rounds and
+    // never checked whether it helped — so it rewrote working code and sometimes looped.
+    // Now: machine-found syntax problems only, two rounds, and every round must actually reduce
+    // the problem count or the previous version is put back.
+    let cur = c, fixedAny = false, problems = await autoCheck(cur, plan.site);
+    const started = problems.length;
+    for (let round = 0; round < 2 && problems.length; round++) {
       p.task = `${label} · ${T('chFixing')} ${round + 1}`; p.content += `\n${problems.join('\n')}\n`; paint(idx);
       await waitCool();
       const meta = {}; let out = '';
-      await stream([{ role: 'system', content: `You fix code. Fix ALL listed problems and anything else that is broken. Return the COMPLETE fixed file in ONE code block — no explanations before it, no omissions like "rest of the code". Keep the design and content. Answer in ${lang}.` },
-        { role: 'user', content: `Problems found when running it:\n- ${problems.join('\n- ')}\n\nCode:\n\`\`\`${cur.lang}\n${cur.code}\n\`\`\`` }], signal, ch => { out += ch; p.content += ch; paint(idx); }, { temperature: 0.2 }, meta);
-      for (let r = 0; r < 3 && meta.finish === 'length'; r++) { meta.finish = null; await stream([{ role: 'system', content: 'Continue the code exactly where it stopped. No repetition.' }, { role: 'assistant', content: out.slice(-6000) }], signal, ch => { out += ch; p.content += ch; paint(idx); }, { temperature: 0.2 }, meta); }
+      await stream([{ role: 'system', content: `You fix syntax errors in code. Fix ONLY the problems listed by the user, nothing else. Do not refactor, do not rename, do not restyle, do not add or remove features, do not "improve" anything. Return the COMPLETE file in ONE code block with every other line byte-identical to the input. Answer in ${lang}.` },
+        { role: 'user', content: `Fix exactly these problems and change nothing else:\n- ${problems.join('\n- ')}\n\nCode:\n\`\`\`${cur.lang}\n${cur.code}\n\`\`\`` }], signal, ch => { out += ch; p.content += ch; paint(idx); }, { temperature: 0.1 }, meta);
+      for (let r = 0; r < 3 && meta.finish === 'length'; r++) { meta.finish = null; await stream([{ role: 'system', content: 'Continue the code exactly where it stopped. No repetition.' }, { role: 'assistant', content: out.slice(-6000) }], signal, ch => { out += ch; p.content += ch; paint(idx); }, { temperature: 0.1 }, meta); }
       const fixed = extractCode(out, plan.site);
-      if (!fixed || fixed.code.length < cur.code.length * 0.5) break;
-      cur = fixed; fixedAny = true;
+      if (!fixed || fixed.code.length < cur.code.length * 0.8) break; // it dropped half the file: keep what we had
+      const after = await autoCheck(fixed, plan.site);
+      if (after.length >= problems.length) { p.content += `\n${T('chWorse')}\n`; break; } // no progress — roll back
+      cur = fixed; problems = after; fixedAny = true;
     }
     codes[k] = cur;
-    const left = fixedAny ? await autoCheck(cur, plan.site) : [];
-    p.task = `${label} · ${left.length ? T('chLeft')(left.length) : fixedAny ? T('chFixed') : 'OK'}`;
+    p.task = `${label} · ${problems.length ? T('chLeft')(problems.length) : fixedAny ? T('chFixed') : started ? T('chFixed') : 'OK'}`;
     p.status = 'done'; paint(idx);
   });
   // 5. one permission for all files, then save and show
@@ -1621,8 +1766,9 @@ async function runChain(text, signal, plan) {
     for (const f of files) await P.ws.write(f.path, f.code);
     await Promise.all(photos.map(x => P.wsDownload(x.url, x.rel, x.thumb).catch(() => null)));
     msg.extra = files.map(f => ({ id: 'a' + (++actSeq), kind: 'file', arg: f.path, state: 'done' }));
-    S.lastProject = { dir, site: plan.site, files: proj ? proj.files : files.map(f => f.path) };
-    if (plan.site) rememberProject(dir, S.lastProject.files, ((files[0].code.match(/<title>([^<]*)<\/title>/i) || [])[1] || dir).trim()).catch(() => {});
+    const projTitle = ((files[0].code.match(/<title>([^<]*)<\/title>/i) || [])[1] || dir).trim();
+    S.lastProject = { dir, site: plan.site, title: projTitle, files: proj ? proj.files : files.map(f => f.path) };
+    if (plan.site) rememberProject(dir, S.lastProject.files, projTitle, text).catch(() => {});
     finish();
     msg.content = proj ? T('chEdited')(files.length) : plan.site ? T('chDoneSite')(pages.filter((pg, k) => codes[k]).length, dir) : T('chDone')(files.length);
     paint(idx); Sound.done();
@@ -1636,6 +1782,50 @@ async function saveChat() {
   const msgs = JSON.parse(JSON.stringify(S.msgs, (k, v) => k === 'live' ? undefined : v));
   await P.chats.save({ id: S.chatId, title: (first ? (first.shown || first.content) : '…').replace(/\s+/g, ' ').slice(0, 60), msgs, lastProject: S.lastProject || null });
   S.chats = await P.chats.list(); renderNav();
+}
+// right-click a chat in the history -> save it to a file
+function closeCtx() { document.querySelector('.ctxmenu')?.remove(); }
+document.addEventListener('contextmenu', e => {
+  const item = e.target.closest && e.target.closest('[data-chat]');
+  closeCtx();
+  if (!item) return;
+  e.preventDefault();
+  const m = document.createElement('div');
+  m.className = 'ctxmenu';
+  m.style.left = Math.min(e.clientX, innerWidth - 220) + 'px';
+  m.style.top = Math.min(e.clientY, innerHeight - 90) + 'px';
+  m.innerHTML = `<button data-act="exportChat" data-v="${item.dataset.chat}">${T('exportChat')}</button>`
+    + `<button data-act="delChat" data-v="${item.dataset.chat}">${T('del')}</button>`;
+  document.body.appendChild(m);
+});
+document.addEventListener('click', closeCtx, true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCtx(); });
+
+// ---------- export a chat to a markdown file ----------
+function chatToMd(c) {
+  const lines = [`# ${c.title || T('newChat')}`, ''];
+  for (const m of c.msgs || []) {
+    const body = noThink(stripMem(m.content || '')).trim();
+    if (!body) continue;
+    lines.push(m.role === 'user' ? `**${T('mdYou')}:**` : `**${m.agent || 'PULSAR'}:**`, '', body, '');
+  }
+  return lines.join('\n');
+}
+async function exportChat(id) {
+  const here = (S.chats || []).find(x => x.id === id);
+  const c = id === S.chatId ? { title: here && here.title, msgs: S.msgs } : await P.chats.get(id);
+  if (!c || !(c.msgs || []).some(m => (m.content || '').trim())) { toast(T('exportEmpty')); return; }
+  const name = (slug(c.title || 'chat') || 'chat') + '.md';
+  const saved = await P.ws.saveAs(name, chatToMd(c));
+  if (saved) toast(T('exportDone'));
+}
+// ---------- earlier versions of a file the agents overwrote ----------
+async function showVersions(rel) {
+  const list = await P.ws.versions(rel);
+  const box = document.getElementById('vers'); if (!box) return;
+  box.innerHTML = list.length
+    ? list.map(v => `<button class="cb" data-act="fileRestore" data-v="${esc(rel)}|${esc(v.file)}">${new Date(v.at).toLocaleString()}</button>`).join('')
+    : `<span class="muted small">${T('verNone')}</span>`;
 }
 async function openChat(id) {
   if (S.streaming) return;
@@ -1662,57 +1852,7 @@ document.addEventListener('drop', async e => {
   const paths = [...(e.dataTransfer.files || [])].map(f => P.pathForFile(f)).filter(Boolean);
   if (paths.length) addAttach(await P.readFiles(paths));
 });
-// --- voice: record -> 16 kHz wav -> whisper on the PC ---
-const V = { rec: null, chunks: [], busy: false };
-function micState(st) { const b = $('#micb'); if (!b) return; b.classList.toggle('rec', st === 'rec'); b.classList.toggle('busy', st === 'busy'); b.title = st === 'rec' ? T('micStop') : st === 'busy' ? T('micBusy') : T('micT'); }
-async function toggleMic() {
-  if (V.busy) return;
-  if (V.rec) { V.rec.stop(); return; }
-  const st = await P.voiceStatus();
-  if (!st.exe || !st.model) {
-    if (!confirm(T('micSetup'))) return;
-    V.busy = true; micState('busy'); toast(T('micDl'));
-    const r = await P.voiceSetup(); V.busy = false; micState('');
-    if (!r.ok) { toast(T('dlError') + ': ' + r.error); return; }
-    toast(T('micReady'));
-  }
-  let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } }); }
-  catch (e) { toast(T('micNo')); return; }
-  V.chunks = []; V.rec = new MediaRecorder(stream);
-  V.rec.ondataavailable = e => e.data.size && V.chunks.push(e.data);
-  V.rec.onstop = async () => {
-    stream.getTracks().forEach(t => t.stop()); V.rec = null; V.busy = true; micState('busy');
-    try {
-      const wav = await toWav16k(new Blob(V.chunks));
-      const r = await P.transcribe(wav, L());
-      if (r.ok && r.text) { const ta = $('#input'); if (ta) { ta.value = (ta.value ? ta.value + ' ' : '') + r.text; ta.dispatchEvent(new Event('input', { bubbles: true })); ta.focus(); } }
-      else toast(r.ok ? T('micEmpty') : T('micErr') + ': ' + r.error);
-    } catch (e) { toast(T('micErr') + ': ' + (e.message || e)); }
-    V.busy = false; micState('');
-  };
-  V.rec.start(); micState('rec'); Sound.tick(1500);
-}
-async function toWav16k(blob) {
-  const ac = new AudioContext(); const buf = await ac.decodeAudioData(await blob.arrayBuffer()); ac.close();
-  const off = new OfflineAudioContext(1, Math.ceil(buf.duration * 16000), 16000);
-  const src = off.createBufferSource(); src.buffer = buf; src.connect(off.destination); src.start();
-  const pcm = (await off.startRendering()).getChannelData(0);
-  const out = new DataView(new ArrayBuffer(44 + pcm.length * 2)); const w = (o, s) => [...s].forEach((c, i) => out.setUint8(o + i, c.charCodeAt(0)));
-  w(0, 'RIFF'); out.setUint32(4, 36 + pcm.length * 2, true); w(8, 'WAVE'); w(12, 'fmt '); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
-  out.setUint32(24, 16000, true); out.setUint32(28, 32000, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true); w(36, 'data'); out.setUint32(40, pcm.length * 2, true);
-  for (let i = 0; i < pcm.length; i++) out.setInt16(44 + i * 2, Math.max(-1, Math.min(1, pcm[i])) * 32767, true);
-  return out.buffer;
-}
-// read answers aloud with the Windows voices
-function speakText(t) {
-  const s = noThink(stripMem(t || '')).replace(/```[\s\S]*?```/g, ' ').replace(/[*#`>_]/g, '').replace(/https?:\/\/\S+/g, '').trim(); if (!s) return;
-  speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(s.slice(0, 4000)); const lang = L() === 'ru' ? 'ru' : 'en';
-  const v = speechSynthesis.getVoices().filter(x => x.lang.toLowerCase().startsWith(lang)); if (v.length) u.voice = v.find(x => /natural|online|svetlana|dmitry|irina|pavel/i.test(x.name)) || v[0];
-  u.lang = lang === 'ru' ? 'ru-RU' : 'en-US'; u.rate = 1.03; speechSynthesis.speak(u);
-}
-const ttsBtn = m => !m.live && m.role === 'assistant' && noThink(m.content || '').trim() ? `<button class="ttsb" data-act="speak" title="${T('speakT')}">${ico('speaker', 14)}</button>` : '';
+const ttsBtn = () => '';
 function lockComposer(on) {
   const ta = $('#input'); if (!ta) return;
   ta.disabled = on; ta.placeholder = on ? T('agentsWorking') : T('placeholder');
@@ -1723,7 +1863,7 @@ async function sendMsg() {
   const images = all.filter(f => f.image).map(f => f.image), files = all.filter(f => !f.image);
   if (images.length && !canSee()) { toast(T('noPicsD')); return; }
   const text = (typed || T('attachAsk')) + files.map(f => `\n\n[Attached file: ${f.name}${f.cut ? ' (cut)' : ''}]\n\`\`\`\n${f.text}\n\`\`\``).join('');
-  S.allowAll = false; S.allowedHosts = new Set();
+  S.allowAll = false; S.allowedHosts = new Set(); S.readFiles = new Set();
   if (!all.length && /^(открой|открыть|покажи|open)?\s*(браузер|browser)\s*(открой|открыть|open)?[.!]*$/i.test(typed)) {
     ta.value = ''; S.msgs.push({ role: 'user', content: typed, shown: typed }); addMsg(S.msgs.length - 1);
     if (!S.panel) openPanel(); S.msgs.push({ role: 'assistant', content: T('browserOpened') }); addMsg(S.msgs.length - 1); Sound.done(); saveChat().catch(() => {}); return;
@@ -1745,7 +1885,10 @@ async function sendMsg() {
     S.msgs.push({ role: 'assistant', content: T('alreadySaved')(S.ws + '\\' + p.dir.replace(/\//g, '\\')), extra: p.files.map(f => ({ id: 'a' + (++actSeq), kind: 'file', arg: f, state: 'done' })) }); addMsg(S.msgs.length - 1);
     P.ws.openFile(p.dir); S.streaming = null; setSendBtn(); lockComposer(false); Sound.done(); saveChat().catch(() => {}); return;
   }
-  S.lastAgent = chain ? (plan.urls.length || plan.research ? 'PULSAR IN BROWSER → PULSAR CODE' : 'PULSAR CODE ×2') : ag.name; S.lastAgentId = chain ? 'coder' : ag.id;
+  // the pill used to say "×2" whatever actually ran — show the real number of parallel coders
+  const par = realSlots(S.running) || 1;
+  S.lastAgent = chain ? (plan.urls.length || plan.research ? 'PULSAR IN BROWSER → PULSAR CODE' : 'PULSAR CODE' + (par > 1 ? ' ×' + par : '')) : ag.name;
+  S.lastAgentId = chain ? 'coder' : ag.id;
   const pill = $('#apill'); if (pill && auto) { pill.textContent = S.lastAgent; pill.classList.remove('flash'); void pill.offsetWidth; pill.classList.add('flash'); }
   try {
     if (chain && haveModel()) await runChain(text, ctl.signal, plan);
@@ -1787,7 +1930,6 @@ async function sendMsg() {
   S.streaming = null; setSendBtn(); lockComposer(false); stopped ? Sound.tick(900) : Sound.done(); $('#input')?.focus();
   saveChat().catch(() => {});
   if (!stopped) P.notify('PULSAR', T('notifyDone')).catch(() => {});
-  if (!stopped && S.st.tts) { const last = [...S.msgs].reverse().find(m => m.role === 'assistant' && (m.content || '').trim()); if (last) speakText(last.content); }
 }
 
 // ---------- events ----------
@@ -1814,24 +1956,15 @@ root.addEventListener('click', async e => {
     case 'designTheme': if (e.target.closest('[data-act=designPreview]')) break; await save({ designTheme: v }); Sound.tick(1500); S._lastTab = 'design'; renderMain(); break;
     case 'designPreview': { const k = Math.floor(Math.random() * DESIGN.EXAMPLES.length); browse('data:text/html;charset=utf-8,' + encodeURIComponent(DESIGN.preview(v, k)), true); break; }
     case 'apiCheck': await apiCheckNow(); break;
-    case 'apiPick': {
-      const c = S.apiCheck; if (!c || c.pinging) return;
-      if ((S.st.apis || []).some(a => a.url === c.url && a.key === c.key && a.model === v)) return;
-      c.pinging = v; const box = $('#aList'); if (box) box.innerHTML = apiModelList();
-      const nm = ($('#aName')?.value || S.apiName || '').trim() || c.provider; const a = { name: nm, url: c.url, key: c.key, kind: c.kind, model: v };
-      const r = await P.apiPing(a).catch(e => ({ ok: false, error: String(e.message || e) }));
-      c.pinging = null;
-      if (r.ok) { await save({ apis: [...(S.st.apis || []), a] }); S.apiName = ''; toast(T('apiAdded')(nm, v)); Sound.done(); }
-      else { toast(r.error); Sound.tick(700); }
-      S._lastTab = 'api'; renderMain(); break;
-    }
-    case 'apiDel': { const l = [...(S.st.apis || [])]; l.splice(+v, 1); await save({ apis: l }); if (/^(api|tog):/.test(S.sel || '')) { S.sel = null; await save({ sel: null }); } Sound.tick(1200); S._lastTab = 'api'; renderMain(); break; }
+    case 'apiModel': { const [i, mid] = String(v).split('|'); const l = [...(S.st.apis || [])]; if (l[+i]) { l[+i] = { ...l[+i], model: mid }; await save({ apis: l }); showVision(); renderMain(); } break; }
+    case 'apiDel': { const l = [...(S.st.apis || [])]; l.splice(+v, 1); await save({ apis: l }); if (/^(api|tog):/.test(S.sel || '')) { S.sel = null; await save({ sel: null }); } Sound.tick(1200); S._lastTab = 'settings'; renderMain(); break; }
     case 'sKey': await save({ searchKey: $('#sKey').value.trim(), pexelsKey: ($('#pKey')?.value || '').trim() }); toast(T('saved')); break;
     case 'newChat': S.streaming?.abort(); S.msgs = []; S.chatId = null; S.lastProject = null; S._lastTab = null; renderNav(); renderMain(); break;
     case 'openChat': if (!e.target.closest('.bx')) openChat(v); break;
     case 'delChat': await P.chats.del(v); if (S.chatId === v) { S.chatId = null; S.msgs = []; if (S.tab === 'chat') { S._lastTab = null; renderMain(); } } S.chats = await P.chats.list(); renderNav(); break;
     case 'recDl': if (!$('#main')) await appScreen(); S.tab = 'models'; renderNav(); renderMain(); S.autoRun = v; downloadModel(v); break;
     case 'updInstall': P.installUpdate(); break;
+    case 'checkUpd': { updCheck = null; const r = await startUpdCheck(); toast(r && r.version ? T('updUpdating')(r.version) : T('updNone')); break; }
     case 'report': { const f = await P.report(JSON.stringify({ tab: S.tab, running: S.running, slots: S.slots, temps: S.temps, msgs: S.msgs.length })); toast(T('reportDone')); break; }
     case 'endChat':
       S.streaming?.abort(); Object.values(S.pending).forEach(r => r(false)); S.pending = {};
@@ -1839,8 +1972,6 @@ root.addEventListener('click', async e => {
       renderNav(); renderMain(); toast(T('ended')); break;
     case 'send': sendMsg(); break;
     case 'boostRetry': if (S.running && !S.streaming) { const id = S.running; toast(T('bApply')); startModel(id); } break;
-    case 'mic': toggleMic(); break;
-    case 'speak': { const i = +b.closest('.msg')?.dataset.i; if (speechSynthesis.speaking) { speechSynthesis.cancel(); break; } if (S.msgs[i]) speakText(S.msgs[i].content); break; }
     case 'jump': { S.follow = true; const box = $('#msgs'); if (box) { box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' }); S._auto = true; } showJump(); break; }
     case 'stop': S.streaming?.abort(); Object.values(S.pending).forEach(r => r(false)); S.pending = {}; break;
     case 'allow': case 'deny': { const r = S.pending[v]; delete S.pending[v]; r && r(b.dataset.act === 'allow'); break; }
@@ -1881,6 +2012,10 @@ root.addEventListener('click', async e => {
     case 'projOpen': { const r = await P.ws.run(v).catch(() => null); if (r && r.preview) browse(r.preview, true); break; }
     case 'projEdit': openEditor(v); break;
     case 'projFolder': P.ws.openFile(v); break;
+    case 'projDel': await deleteProject(v); break;
+    case 'exportChat': await exportChat(v); break;
+    case 'fileVers': await showVersions(v); break;
+    case 'fileRestore': { const [rel, file] = String(v).split('|'); await P.ws.restore(rel, file); toast(T('verRestored')); if (S.editFile === rel) openEditor(rel); break; }
     case 'projGo': { const pr = (S.projects || []).find(p => p.dir === v); if (pr) { S.msgs = []; S.chatId = null; S.lastProject = { dir: pr.dir, site: true, files: pr.files }; S.tab = 'chat'; S._lastTab = null; renderNav(); renderMain(); toast(T('projCont')(pr.dir)); } break; }
     case 'runSend': sendRunInput(); break;
     case 'dkill': if (S.runId) { P.runKill(S.runId); } break;
@@ -1907,7 +2042,11 @@ document.addEventListener('keydown', e => {
 });
 root.addEventListener('change', async e => {
   const t = e.target;
-  if (t.dataset.act === 'sel') { S.sel = t.value; save({ sel: t.value }); Sound.tick(1500); showVision(); }
+  if (t.dataset.act === 'sel') { S.sel = t.value; save({ sel: t.value }); Sound.tick(1500); showVision(); renderMain(); }
+  if (t.dataset.act === 'apiModelSel') {
+    const i = +t.dataset.v, l = [...(S.st.apis || [])];
+    if (l[i]) { l[i] = { ...l[i], model: t.value }; await save({ apis: l }); Sound.tick(1500); showVision(); renderMain(); }
+  }
   if (t.dataset.act === 'agentSel') { await save({ agent: t.value }); Sound.tick(1500); }
 });
 root.addEventListener('keydown', e => {
@@ -1917,7 +2056,6 @@ root.addEventListener('input', e => {
   if (e.target.id === 'input') { e.target.style.height = 'auto'; e.target.style.height = Math.min(200, e.target.scrollHeight) + 'px'; }
   if (e.target.id === 'aName') S.apiName = e.target.value;
   if (e.target.id === 'aKey') { clearTimeout(S._ak); const v = e.target.value.trim(); if (v.length >= 20 && !/\s/.test(v) && S.apiCheck?.key !== v) S._ak = setTimeout(apiCheckNow, 700); }
-  if (e.target.id === 'aQ' && S.apiCheck) { S.apiCheck.q = e.target.value; const b = $('#aList'); if (b) b.innerHTML = apiModelList(); }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'aKey') { e.preventDefault(); clearTimeout(S._ak); apiCheckNow(); } });
 function tempsHTML() {
@@ -1949,7 +2087,18 @@ function applyTheme() { document.documentElement.classList.toggle('light', S.st.
 // ---------- boot ----------
 (async () => {
   S.st = await P.getSettings(); applyTheme();
-  if (S.st.apis) await save({ apis: S.st.apis.filter(a => a && a.url && a.model && a.cloud !== 'kimi').map(a => ({ ...a, kind: a.kind || (/anthropic\.com/.test(a.url) ? 'anthropic' : 'openai') })) });
+  P.version().then(v => { S.version = v; }).catch(() => {});
+  if (S.st.apis) {
+    // 1.x stored one entry per model; 2.0 stores one entry per key with all of its models
+    const merged = [];
+    for (const a of S.st.apis.filter(x => x && x.url && x.model && x.cloud !== 'kimi')) {
+      const kind = a.kind || (/anthropic\.com/.test(a.url) ? 'anthropic' : 'openai');
+      const prev = merged.find(x => x.url === a.url && x.key === a.key);
+      if (prev) { prev.models = [...new Set([...(prev.models || []), ...(a.models || [a.model])])]; continue; }
+      merged.push({ ...a, kind, models: [...new Set(a.models || [a.model])] });
+    }
+    await save({ apis: merged });
+  }
   if (S.st.agent === 'team' || !['chat', 'coder', 'files', 'browser'].includes(S.st.agent || 'coder')) await save({ agent: 'chat' });
   if (S.st.lang) document.documentElement.lang = S.st.lang;
   if (!S.st.lang) langScreen(); else intro();

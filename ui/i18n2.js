@@ -77,7 +77,7 @@ full file content
 \`\`\`
 \`\`\`search:what to look up
 \`\`\`
-file: creates or overwrites a file. run: runs a .py or .js file (stdin is closed, so avoid input(); use fixed example values) or opens an .html file in the built-in preview. read: reads a file. list: lists a folder. mkdir:folder creates a folder. move:old/path|new/path moves or renames a file or folder (nothing is ever deleted; the user is asked first). open: opens a website in the built-in browser and gives you its text. search: searches the internet and gives you results with links.
+file: creates or overwrites a file. run: runs a .py or .js file (stdin is closed, so avoid input(); use fixed example values) or opens an .html file in the built-in preview. read: reads a file. list: lists a folder. read: and list: also accept a full path anywhere on the computer (read:C:\\Users\\Name\\Downloads\\notes.txt) — but file:, mkdir: and move: only work inside the workspace folder. mkdir:folder creates a folder. move:old/path|new/path moves or renames a file or folder (nothing is ever deleted; the user is asked first). open: opens a website in the built-in browser and gives you its text. search: searches the internet and gives you results with links.
 When the user asks to make a website or program, write the COMPLETE code in one file block (for a site: one html file with CSS and JS inside, modern clean design). When the user asks to open a site, use open:. Never answer that you cannot save files, open websites or access the internet: you can, with these blocks.
 After your blocks, stop. The results come back to you in the next message; then continue or give the final answer. Do not repeat a block that already succeeded. Answer in the user's language.`;
 const PROVIDERS = [];
@@ -88,17 +88,17 @@ Object.assign(I18N.en, { autoModel: 'Auto', autoModelD: 'PULSAR picks the best d
   cloudFree: 'Cloud · free', kimiD: 'Very strong model by Moonshot AI. Runs online, nothing is downloaded. Needs a free OpenRouter key.', kimiHow: 'The key is free:' });
 AGENTS.ru = [
   ['coder', 'PULSAR CODE', 'Пишет код, сайты и программы. Сам сохраняет файлы и запускает их.', 'Ты PULSAR CODE — сильный программист и веб-дизайнер. Пиши полный рабочий код без сокращений и заглушек. Сайт — один полный HTML-файл со встроенными CSS и JS: современный дизайн, крупная типографика, много воздуха, плавные анимации, адаптивность. Сохраняй файлы и запускай код, чтобы проверить. Объясняй коротко.', true],
-  ['files', 'FILE SUP', 'Создаёт, читает и раскладывает файлы в рабочей папке.', 'Ты FILE SUP — помощник по файлам. Список файлов рабочей папки тебе уже дан. Действуй сразу блоками: read — прочитать, file — создать или переписать, mkdir — создать папку, move — переместить или переименовать. Чтобы разложить файлы, создай папки по типу (Документы, Картинки, Код…) и перемести туда файлы. Ничего не удаляй. В конце коротко скажи, что сделал.', true],
+  ['files', 'PULSAR IN PC', 'Ищет и читает файлы на всём компьютере, создаёт и раскладывает их в папке проектов.', 'Ты PULSAR IN PC — агент по файлам на этом компьютере. Список файлов папки проектов тебе уже дан. Действуй сразу блоками: read — прочитать файл, list — посмотреть папку, file — создать или переписать, mkdir — создать папку, move — переместить или переименовать. Читать и смотреть ты можешь любую папку компьютера: укажи полный путь, например list:C:\\Users\\Имя\\Downloads. Менять, создавать и перемещать ты можешь только внутри папки проектов — за её пределами ничего не трогай, а если нужно, скажи пользователю путь и попроси перенести самому. Ничего не удаляй. В конце коротко скажи, что сделал.', true],
   ['browser', 'PULSAR IN BROWSER', 'Ищет в интернете, открывает сайты во встроенном браузере и делает выжимку.', 'Ты PULSAR IN BROWSER — агент для интернета. Ищи информацию, открывай сайты во встроенном браузере и работай с ними как человек: нажимай кнопки и ссылки (click:N), вводи текст в поля (type:N|текст{enter}), листай (scroll:down), возвращайся (back:). N — номер элемента из списка под текстом страницы, можно написать и текст кнопки. Делай одно-два действия за раз и смотри, что получилось. Отделяй факты от догадок и давай короткий вывод со ссылками.', true]
 ];
 AGENTS.en = [
   ['coder', 'PULSAR CODE', 'Writes code, websites and programs. Saves and runs files itself.', 'You are PULSAR CODE, a strong programmer and web designer. Write complete working code with no placeholders. A website is one complete HTML file with embedded CSS and JS: modern design, large type, whitespace, smooth animations, responsive. Save files and run code to check. Explain briefly.', true],
-  ['files', 'FILE SUP', 'Creates, reads and organizes files in the workspace.', 'You are FILE SUP, a file assistant. You already get the workspace file list. Act right away with blocks: read, file (create or rewrite), mkdir (new folder), move (move or rename). To organize, create folders by type (Documents, Images, Code…) and move files there. Never delete anything. Finish with a short summary.', true],
+  ['files', 'PULSAR IN PC', 'Finds and reads files anywhere on the computer, creates and organizes them in the projects folder.', 'You are PULSAR IN PC, the file agent for this computer. You already get the projects folder listing. Act right away with blocks: read (read a file), list (look at a folder), file (create or rewrite), mkdir (new folder), move (move or rename). You may READ and LIST any folder on the computer — give a full path, e.g. list:C:\\Users\\Name\\Downloads. You may only create, change and move things inside the projects folder — never touch anything outside it; if something needs moving there, tell the user the path and ask them to do it. Never delete anything. Finish with a short summary.', true],
   ['browser', 'PULSAR IN BROWSER', 'Searches the web, opens sites in the built-in browser, summarizes.', 'You are PULSAR IN BROWSER, a web agent. Search, open sites in the built-in browser and use them like a person: click buttons and links (click:N), type into fields (type:N|text{enter}), scroll (scroll:down), go back (back:). N is the element number from the list under the page text; the button text also works. Do one or two actions at a time and check the result. Separate facts from guesses, give a short conclusion with links.', true]
 ];
 
-Object.assign(I18N.ru, { autoAgentD: 'PULSAR сам выбирает агента под каждый запрос: разговор — HELLO PULSAR, код и сайты — PULSAR CODE, файлы и папки — FILE SUP, поиск и сайты в интернете — PULSAR IN BROWSER.', autoAgentPick: 'агент выберется сам' });
-Object.assign(I18N.en, { autoAgentD: 'PULSAR picks the agent for every request: talk — HELLO PULSAR, code and sites — PULSAR CODE, files and folders — FILE SUP, web search and sites — PULSAR IN BROWSER.', autoAgentPick: 'agent is picked automatically' });
+Object.assign(I18N.ru, { autoAgentD: 'PULSAR сам выбирает агента под каждый запрос: разговор — HELLO PULSAR, код и сайты — PULSAR CODE, файлы и папки — PULSAR IN PC, поиск и сайты в интернете — PULSAR IN BROWSER.', autoAgentPick: 'агент выберется сам' });
+Object.assign(I18N.en, { autoAgentD: 'PULSAR picks the agent for every request: talk — HELLO PULSAR, code and sites — PULSAR CODE, files and folders — PULSAR IN PC, web search and sites — PULSAR IN BROWSER.', autoAgentPick: 'agent is picked automatically' });
 
 Object.assign(I18N.ru, { catAll: 'Все', catFast: 'Быстрые', catCode: 'Код', catLogic: 'Задачи и логика', catPower: 'Мощные',
   catFastD: 'мгновенные ответы на повседневные вопросы', catCodeD: 'сайты, программы, агенты', catLogicD: 'думают по шагам: математика, задачи', catPowerD: 'умнее, но медленнее и тяжелее',
@@ -225,3 +225,43 @@ Object.assign(I18N.en, { seesPics: 'sees pictures', noPics: 'no pictures', seesP
   phAgent: 'PULSAR · photos', phFind: 'picking photos', phFound: n => `photos: ${n}`, phNone: 'no photos found — kept placeholders', pexelsKey: 'Pexels key for site photos (optional, free)',
   micT: 'Speak', micStop: 'Stop recording', micBusy: 'Recognizing…', micSetup: 'Voice needs a one-time download of the speech model (≈470 MB). Download?', micDl: 'Downloading speech recognition…', micReady: 'Voice is ready — press the mic again',
   micNo: 'No access to the microphone', micEmpty: 'Heard nothing', micErr: 'Could not recognize', speakT: 'Read aloud', oTts: 'Read answers aloud', oTtsD: 'PULSAR reads answers with a Windows voice' });
+
+// ---------- 2.0 ----------
+Object.assign(I18N.ru, {
+  // context budget
+  digHead: 'Краткая память о начале разговора', digTask: 'Задача', digFiles: 'Уже сделанные файлы',
+  // reviewer
+  chWorse: 'после правки ошибок стало не меньше — вернул прошлую версию',
+  // projects
+  projDel: 'Удалить', projDelAsk: (n, f) => `Удалить проект «${n}»? Папка и ${f} файл(ов) уйдут в корзину Windows — оттуда можно вернуть.`,
+  projDeleted: n => `Проект «${n}» в корзине`, projDelErr: 'Не удалось удалить',
+  // file versions
+  verT: 'Прошлые версии', verNone: 'Прошлых версий нет', verRestore: 'Вернуть',
+  verRestored: 'Вернул прошлую версию', verAgo: d => `${d}`,
+  // chat export
+  exportChat: 'Сохранить в файл', exportDone: 'Чат сохранён', exportEmpty: 'Пустой чат', mdYou: 'Я',
+  // settings
+  tSettings: 'Настройки', setSub: 'Всё в одном месте: ключи API, подбор под железо, язык, тема и обновления.',
+  setApi: 'Ключи API', setPerf: 'Железо и скорость', setGeneral: 'Общие', setHeat: 'Перегрев', setUpd: 'Обновления',
+  setTheme: 'Тема', setThemeD: 'Тёмная или светлая', themeDark: 'Тёмная', themeLight: 'Светлая',
+  setWs: 'Папка проектов', setWsD: 'Где агенты создают файлы',
+  apiSub3: 'Вставь ключ и дай ему имя — PULSAR сам определит сервис и подключит все его модели. Какая из них отвечает, выбирается в чате. Ключи хранятся только на этом ПК.',
+  apiModelsN: n => `моделей: ${n}`, apiNow: 'сейчас', apiPickModel: 'Модель этого API',
+  apiAddedAll: (n, c) => `${n} подключён · моделей: ${c}`, updCheck: 'Проверить обновления', updNone: 'Установлена последняя версия'
+});
+Object.assign(I18N.en, {
+  digHead: 'Short memory of how this conversation started', digTask: 'Task', digFiles: 'Files already made',
+  chWorse: 'the fix did not reduce the problems — previous version restored',
+  projDel: 'Delete', projDelAsk: (n, f) => `Delete project "${n}"? The folder and ${f} file(s) go to the Windows recycle bin — you can restore them from there.`,
+  projDeleted: n => `Project "${n}" is in the recycle bin`, projDelErr: 'Could not delete',
+  verT: 'Earlier versions', verNone: 'No earlier versions', verRestore: 'Restore',
+  verRestored: 'Previous version restored', verAgo: d => `${d}`,
+  exportChat: 'Save to file', exportDone: 'Chat saved', exportEmpty: 'Empty chat', mdYou: 'Me',
+  tSettings: 'Settings', setSub: 'Everything in one place: API keys, hardware tuning, language, theme and updates.',
+  setApi: 'API keys', setPerf: 'Hardware and speed', setGeneral: 'General', setHeat: 'Overheating', setUpd: 'Updates',
+  setTheme: 'Theme', setThemeD: 'Dark or light', themeDark: 'Dark', themeLight: 'Light',
+  setWs: 'Projects folder', setWsD: 'Where agents create files',
+  apiSub3: 'Paste a key and give it a name — PULSAR detects the service and connects every model it offers. Which one answers is chosen in the chat. Keys stay on this PC.',
+  apiModelsN: n => `${n} models`, apiNow: 'now', apiPickModel: 'Model of this API',
+  apiAddedAll: (n, c) => `${n} connected · ${c} models`, updCheck: 'Check for updates', updNone: 'You already have the latest version'
+});

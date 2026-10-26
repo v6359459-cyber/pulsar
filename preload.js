@@ -16,14 +16,15 @@ contextBridge.exposeInMainWorld('pulsar', {
     get: () => ipcRenderer.invoke('ws:get'), choose: () => ipcRenderer.invoke('ws:choose'), open: () => ipcRenderer.invoke('ws:open'),
     openFile: r => ipcRenderer.invoke('ws:openFile', r), write: (rel, content) => ipcRenderer.invoke('ws:write', { rel, content }),
     read: r => ipcRenderer.invoke('ws:read', r), list: r => ipcRenderer.invoke('ws:list', r), move: (from, to) => ipcRenderer.invoke('ws:move', { from, to }), mkdir: r => ipcRenderer.invoke('ws:mkdir', r), run: r => ipcRenderer.invoke('ws:run', r),
-    console: r => ipcRenderer.invoke('ws:console', r), saveAs: (name, content) => ipcRenderer.invoke('ws:saveAs', { name, content })
+    console: r => ipcRenderer.invoke('ws:console', r), saveAs: (name, content) => ipcRenderer.invoke('ws:saveAs', { name, content }),
+    trash: r => ipcRenderer.invoke('ws:trash', r), count: r => ipcRenderer.invoke('ws:count', r),
+    versions: r => ipcRenderer.invoke('ws:versions', r), restore: (rel, file) => ipcRenderer.invoke('ws:restore', { rel, file })
   },
+  pc: { list: d => ipcRenderer.invoke('pc:list', d), read: f => ipcRenderer.invoke('pc:read', f) },
   chat: (id, url, key, body, kind) => ipcRenderer.send('chat:start', { id, url, key, body, kind }),
   bootOk: () => ipcRenderer.send('boot:ok'),
   mmproj: (id, repos) => ipcRenderer.invoke('model:mmproj', { id, repos }), hasMmproj: id => ipcRenderer.invoke('model:hasMmproj', id),
   findPhotos: (q, n, key) => ipcRenderer.invoke('photos:find', { q, n, key }), wsDownload: (url, rel, alt) => ipcRenderer.invoke('ws:download', { url, rel, alt }),
-  voiceStatus: () => ipcRenderer.invoke('voice:status'), voiceSetup: () => ipcRenderer.invoke('voice:setup'), transcribe: (wav, lang) => ipcRenderer.invoke('voice:transcribe', { wav, lang }),
-  onVoiceProgress: on('voice:progress'),
   apiCheck: (key, url) => ipcRenderer.invoke('api:check', { key, url }), apiPing: a => ipcRenderer.invoke('api:ping', a),
   chatAbort: id => ipcRenderer.send('chat:abort', id),
   onChunk: on('chat:chunk'),

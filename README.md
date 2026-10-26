@@ -21,11 +21,13 @@ No account, no subscription — download a model and start building. Connect clo
 - **Picks the right model for your hardware.** PULSAR checks your GPU, RAM and CPU, recommends a model, and tunes compression, GPU layers and context automatically.
 - **Agents that actually do things.** They write files, run code, open websites and read them — inside a workspace folder you control.
 - **Several agents in one request.** Send a link and say "make a site like this" — one agent studies the example, coders build it (two at once if your GPU allows), PULSAR runs the result, and another agent fixes the errors it finds.
-- **Asks before saving.** Nothing is written to your PC without your OK.
+- **Asks before saving, and every overwrite can be undone.** Nothing is written to your PC without your OK, and the previous content of any file an agent overwrites is kept (last 10 versions) so a bad edit can be rolled back.
 - **Built-in browser** with tabs. Agents can click, type and scroll in it — and ask before opening every new website.
 - **Code editor and output panel** on the side: edit what the agents made, run Python / JavaScript (games with keyboard input work). Python is bundled, nothing to install.
 - **Attach files** (txt, pdf, docx, csv, code) and ask questions about them.
-- **Projects** tab with everything your agents built; continue any project in chat.
+- **Projects** tab with everything your agents built; continue any project in chat, or delete one — the folder goes to the Windows recycle bin, never straight to nowhere.
+- **Project memory.** Agents see the current project's folder, its files and what you asked for earlier, so "change the font on the site" edits that site instead of starting a new one. Before changing a file that exists, an agent has to read it first.
+- **Export a chat**: right-click it in the history and save the whole conversation as markdown.
 - **Use your own GGUF models** from disk.
 - **Runs in the background** from the tray, with a Windows notification when agents finish.
 - **Light and dark themes.**
@@ -34,10 +36,9 @@ No account, no subscription — download a model and start building. Connect clo
 - **English and Russian** interface.
 
 - **Design mode.** Websites are built from 25 ready shadcn/ui-style blocks (hero, pricing, menu, reviews, FAQ, dashboard…) in one of four styles — Apple minimalism, dark tech / neon, glass and soft colors, clean corporate. PULSAR adds the CSS and the animations, so even a small model makes a clean site. Can be turned off.
-- **Any cloud API.** Paste a key from OpenRouter, Groq, Gemini, Claude, OpenAI, DeepSeek, xAI and others — PULSAR detects the provider, lists the models and checks that they answer. In chat pick the PC model, an API model, or **Together**: both answer, review each other and the best final answer comes out.
+- **Any cloud API.** Paste a key from OpenRouter, Groq, Gemini, Claude, OpenAI, DeepSeek, xAI and others — PULSAR detects the provider and connects every model it offers at once; you pick which one answers in the chat. Or pick the PC model, or **Together**: both answer, review each other and the best final answer comes out.
 - **Vision.** Models marked "sees pictures" (Gemma 4, Qwen3.5 9B, and vision API models) understand photos and screenshots — "make a site like this screenshot".
 - **Real photos on sites.** On request PULSAR picks photos from Openverse (or Pexels with your free key) and saves them next to the site.
-- **Voice.** Speak instead of typing — Whisper runs on your PC. Answers can be read aloud.
 - **Safe updates.** API keys are encrypted with Windows. If a new version fails to start twice, PULSAR rolls back to the last one that worked.
 - **Boosters.** Small helper models make big ones answer 1.5–2× faster (speculative decoding) — downloaded and plugged in automatically.
 - **Loop guard.** If a model starts repeating itself, PULSAR stops it.
@@ -48,7 +49,7 @@ No account, no subscription — download a model and start building. Connect clo
 |---|---|
 | **HELLO PULSAR** | Just talk: questions, advice, ideas. Remembers what you tell it about yourself. |
 | **PULSAR CODE** | Websites, programs, scripts. Saves files and runs them to check. |
-| **FILE SUP** | Lists, reads, creates and organizes files in the workspace. Never deletes. |
+| **PULSAR IN PC** | Reads and searches files anywhere on the computer; creates and organizes them inside the projects folder. Never deletes. |
 | **PULSAR IN BROWSER** | Searches the web, opens sites in the built-in browser, summarizes with links. |
 
 With **Auto** on, PULSAR picks the agent for every message and chains them when a task needs more than one:
@@ -90,12 +91,15 @@ What you can do: check the file on [VirusTotal](https://www.virustotal.com) (usu
 git clone https://github.com/v6359459-cyber/pulsar
 cd pulsar
 npm install
+npm test         # smoke test: no Electron or Windows needed
 npm run engine   # downloads the llama.cpp engine for Windows
 npm start        # run in development
 npm run build    # make the installer in ./dist
 ```
 
-Releases are built by GitHub Actions (`.github/workflows/release.yml`) and published to GitHub Releases; the app updates itself from there.
+Releases are built by GitHub Actions (`.github/workflows/release.yml`) and published to GitHub Releases; the app updates itself from there. The workflow syntax-checks every script and runs the smoke test before it builds, so a broken release does not get published.
+
+The llama.cpp engine version is pinned in two places that must stay in step: `LLAMA_TAG` in `main.js` and `TAG` in `scripts/fetch-engine.js`.
 
 ## Report a problem
 
@@ -118,14 +122,15 @@ In PULSAR open **Optimization → Report a problem**. It saves a report file (ve
 - Сам проверяет железо и советует модель, сам подбирает настройки.
 - Агенты пишут сайты и программы, сохраняют файлы, запускают код и открывают сайты во встроенном браузере.
 - Несколько агентов в одном запросе: один разбирает пример по ссылке, двое пишут код, PULSAR проверяет результат, ещё один агент исправляет ошибки.
-- Перед сохранением на компьютер всегда спрашивает разрешение.
+- Перед сохранением на компьютер всегда спрашивает разрешение, а прошлую версию перезаписанного файла всегда можно вернуть.
 - **Режим дизайна:** сайты собираются из 25 готовых блоков в стиле shadcn/ui, 4 стиля (минимализм Apple, тёмный tech / неон, стекло, корпоративный), стили и анимации PULSAR добавляет сам. Можно выключить.
-- **Любые облачные API:** вставь ключ — PULSAR сам поймёт сервис, покажет модели и проверит их. В чате: модель на ПК, модель по API или «Вместе» — обе отвечают, спорят и выдают лучший итог.
+- **Любые облачные API:** вставь ключ и дай имя — PULSAR сам определит сервис и подключит все его модели; какая отвечает, выбираешь в чате. Или модель на ПК, или «Вместе» — обе отвечают, спорят и выдают лучший итог.
 - **Модели видят картинки** (Gemma 4, Qwen3.5 9B и API-модели со зрением): «сделай сайт как на скрине».
 - **Настоящие фото на сайтах** с Openverse или Pexels — сохраняются в папку сайта.
-- **Голос:** говоришь вместо того, чтобы печатать (Whisper на ПК), ответы можно слушать.
 - **Ключи API зашифрованы**, а если новая версия не запустится дважды — PULSAR сам вернёт прошлую.
 - **Ускорители** — маленькие модели-помощники, ответы быстрее в 1,5–2 раза.
+- **Память проекта:** агент видит папку проекта, её файлы и прошлые просьбы, а перед правкой обязан прочитать файл. «Поменяй шрифт на сайте» правит тот самый сайт, а не делает новый.
+- **Удаление проектов** в корзину Windows и **экспорт чата** в файл по правому клику.
 - Защита от перегрева (порог для видеокарты и процессора, по умолчанию 75 °C), защита от зацикливания, история чатов, докачка моделей, автообновления.
 
 **Скачать:** [последняя версия](https://github.com/v6359459-cyber/pulsar/releases/latest). Если Windows предупредит о неизвестном издателе — «Подробнее → Выполнить в любом случае».

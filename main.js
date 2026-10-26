@@ -28,7 +28,7 @@ function send(ch, d) { if (win && !win.isDestroyed()) win.webContents.send(ch, d
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1280, height: 820, minWidth: 980, minHeight: 680, backgroundColor: '#000000',
+    width: 1280, height: 820, minWidth: 980, minHeight: 680, backgroundColor: '#1c1b19',
     titleBarStyle: 'hidden', titleBarOverlay: { color: '#000000', symbolColor: '#ffffff', height: 36 },
     icon: path.join(__dirname, 'build', 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, autoplayPolicy: 'no-user-gesture-required', webviewTag: true }
@@ -42,6 +42,7 @@ app.whenReady().then(() => {
   for (const d of Object.values(DIRS())) fs.mkdirSync(d, { recursive: true });
   try { if (fs.existsSync(SETTINGS())) writeSettings(readSettings()); } catch {}
   if (bootCheck()) return;
+  try { const b = readBoot(); if (!b.voiceDropped) { dropVoice(); writeBoot({ ...readBoot(), voiceDropped: true }); } } catch {}
   createWindow();
 });
 
@@ -62,7 +63,7 @@ function bootCheck() {
 ipcMain.on('boot:ok', () => { const v = app.getVersion(); writeBoot({ ...readBoot(), version: v, pending: false, fails: 0, okVersion: v }); });
 async function rollback(okV, badV) {
   writeBoot({ ...readBoot(), blocked: badV, pending: false, fails: 0 });
-  const w = new BrowserWindow({ width: 520, height: 260, frame: false, resizable: false, backgroundColor: '#000000', show: true });
+  const w = new BrowserWindow({ width: 520, height: 260, frame: false, resizable: false, backgroundColor: '#1c1b19', show: true });
   const page = t => 'data:text/html;charset=utf-8,' + encodeURIComponent(`<body style="margin:0;background:#000;color:#fff;font:300 18px/1.5 Segoe UI,system-ui,sans-serif;display:flex;flex-direction:column;justify-content:center;height:100vh;padding:0 40px;box-sizing:border-box"><div style="font-size:13px;letter-spacing:.4em;color:#777;margin-bottom:14px">PULSAR</div><div id="t">${t}</div></body>`);
   const say = t => { try { w.webContents.executeJavaScript(`document.getElementById('t').innerHTML=${JSON.stringify(t)}`); } catch {} };
   await w.loadURL(page(`Версия ${badV} не запускается.<br>Возвращаю ${okV}…`));
@@ -193,6 +194,8 @@ ipcMain.handle('model:partial', () => { const o = {}; for (const f of fs.readdir
 ipcMain.handle('open:models', () => shell.openPath(DIRS().models));
 
 // ---------- engine (llama.cpp) ----------
+// keep in step with scripts/fetch-engine.js
+const LLAMA_TAG = 'b11669';
 function findFile(dir, name) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, e.name);
@@ -216,14 +219,12 @@ async function ensureEngine(kind) {
   let exe = findFile(dir, 'llama-server.exe');
   if (exe) return exe;
   send('engine:status', { stage: 'download', kind });
-  const rel = await (await fetch('https://api.github.com/repos/ggml-org/llama.cpp/releases/latest', { headers: { 'User-Agent': 'PULSAR' } })).json();
-  const assets = rel.assets || [];
-  const pick = kind === 'vulkan'
-    ? assets.find(a => /bin-win-vulkan-x64\.zip$/i.test(a.name))
-    : (assets.find(a => /bin-win-cpu-x64\.zip$/i.test(a.name)) || assets.find(a => /bin-win-avx2-x64\.zip$/i.test(a.name)));
-  if (!pick) throw new Error('engine asset not found');
-  const zip = path.join(dir, pick.name);
-  await download(pick.browser_download_url, zip, (g, t) => send('engine:status', { stage: 'download', kind, got: g, total: t }));
+  // pinned on purpose: llama-server's flags change between releases, and /releases/latest
+  // once silently broke the app for everyone. Same tag as scripts/fetch-engine.js.
+  const name = `llama-${LLAMA_TAG}-bin-win-${kind}-x64.zip`;
+  const url = `https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_TAG}/${name}`;
+  const zip = path.join(dir, name);
+  await download(url, zip, (g, t) => send('engine:status', { stage: 'download', kind, got: g, total: t }));
   send('engine:status', { stage: 'unpack', kind });
   await unzip(zip, dir);
   try { fs.unlinkSync(zip); } catch {}
@@ -346,8 +347,41 @@ ipcMain.handle('ws:choose', async () => {
 });
 ipcMain.handle('ws:open', () => shell.openPath(workspace()));
 ipcMain.handle('ws:openFile', (_e, rel) => shell.openPath(wsPath(rel)));
+// every overwrite keeps the previous content in .pulsar/history, so a bad edit can be undone
+const HIST = () => path.join(workspace(), '.pulsar', 'history');
+const histName = rel => String(rel).replace(/[\\/]/g, '__');
+function keepCopy(p, rel) {
+  if (!fs.existsSync(p)) return null;
+  try {
+    const dir = HIST(); fs.mkdirSync(dir, { recursive: true });
+    const f = path.join(dir, `${histName(rel)}.${Date.now()}.bak`);
+    fs.copyFileSync(p, f);
+    // keep the last 10 copies of each file
+    const mine = fs.readdirSync(dir).filter(n => n.startsWith(histName(rel) + '.')).sort();
+    for (const old of mine.slice(0, -10)) { try { fs.unlinkSync(path.join(dir, old)); } catch {} }
+    return f;
+  } catch { return null; }
+}
 ipcMain.handle('ws:write', (_e, { rel, content }) => {
-  const p = wsPath(rel); fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, content, 'utf8'); return p;
+  const p = wsPath(rel); fs.mkdirSync(path.dirname(p), { recursive: true });
+  const had = keepCopy(p, rel);
+  fs.writeFileSync(p, content, 'utf8');
+  return { path: p, backup: !!had };
+});
+ipcMain.handle('ws:versions', (_e, rel) => {
+  try {
+    return fs.readdirSync(HIST()).filter(n => n.startsWith(histName(rel) + '.'))
+      .map(n => ({ file: n, at: +(n.match(/\.(\d+)\.bak$/) || [])[1] || 0 }))
+      .sort((a, b) => b.at - a.at).slice(0, 10);
+  } catch { return []; }
+});
+ipcMain.handle('ws:restore', (_e, { rel, file }) => {
+  const src = path.join(HIST(), path.basename(String(file || '')));
+  if (!src.startsWith(HIST() + path.sep) || !fs.existsSync(src)) throw new Error('no such version');
+  const p = wsPath(rel);
+  keepCopy(p, rel); // so "restore" itself can be undone
+  fs.copyFileSync(src, p);
+  return true;
 });
 ipcMain.handle('ws:move', (_e, { from, to }) => {
   const a = wsPath(from), b = wsPath(to);
@@ -356,6 +390,40 @@ ipcMain.handle('ws:move', (_e, { from, to }) => {
   fs.mkdirSync(path.dirname(b), { recursive: true }); fs.renameSync(a, b); return true;
 });
 ipcMain.handle('ws:mkdir', (_e, rel) => { fs.mkdirSync(wsPath(rel), { recursive: true }); return true; });
+// PULSAR IN PC may LOOK anywhere on the computer, but may only CHANGE things inside the
+// workspace: these two handlers are read-only on purpose, and writing still goes through wsPath.
+const SYS_DIR = /^[a-z]:[\\/](windows|program files|program files \(x86\)|programdata|\$recycle)/i;
+ipcMain.handle('pc:list', (_e, dir) => {
+  const p = path.resolve(String(dir || ''));
+  if (SYS_DIR.test(p)) throw new Error('system folder, not listed');
+  const out = [];
+  for (const e of fs.readdirSync(p, { withFileTypes: true })) {
+    if (out.length >= 300 || e.name.startsWith('.')) continue;
+    let size = 0; try { size = e.isFile() ? fs.statSync(path.join(p, e.name)).size : 0; } catch {}
+    out.push(e.isDirectory() ? e.name + '/' : `${e.name} (${Math.round(size / 1024)} KB)`);
+  }
+  return out;
+});
+ipcMain.handle('pc:read', async (_e, file) => {
+  const p = path.resolve(String(file || ''));
+  if (SYS_DIR.test(p)) throw new Error('system folder, not read');
+  const r = await readAny(p);
+  return r.text != null ? r.text.slice(0, 20000) : '(binary file, cannot be read as text)';
+});
+// deleting a project: straight to the Windows recycle bin, so the user can always get it back
+ipcMain.handle('ws:trash', async (_e, rel) => {
+  const p = wsPath(rel);
+  if (p === path.resolve(workspace())) throw new Error('refusing to delete the whole workspace');
+  if (!fs.existsSync(p)) return { ok: true, missing: true };
+  try { await shell.trashItem(p); return { ok: true }; }
+  catch (e) { return { ok: false, error: String(e.message || e) }; }
+});
+ipcMain.handle('ws:count', (_e, rel) => {
+  let n = 0;
+  const walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { if (n > 5000) return; const q = path.join(d, e.name); e.isDirectory() ? walk(q) : n++; } };
+  try { walk(wsPath(rel)); } catch {}
+  return n;
+});
 ipcMain.handle('ws:read', (_e, rel) => {
   const p = wsPath(rel); const st = fs.statSync(p);
   if (st.size > 200000) throw new Error('file too large');
@@ -776,43 +844,12 @@ ipcMain.handle('ws:download', async (_e, { url, rel, alt }) => {
   return { ok: false };
 });
 
-// ---------- voice: whisper.cpp + ggml-small, downloaded on first use ----------
-const VOICE = () => path.join(DATA(), 'voice');
-// newer whisper.cpp releases (v1.9.3+) ship sources only, so /releases/latest has no Windows build: pin the last one that does
-const WHISPER_URL = 'https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.2/whisper-bin-x64.zip';
-function whisperExe() {
-  const bundled = path.join(process.resourcesPath || '', 'engine', 'whisper'), dev = path.join(__dirname, 'engine', 'whisper');
-  for (const d of [bundled, dev, VOICE()]) { if (!fs.existsSync(d)) continue; const f = findFile(d, 'whisper-cli.exe') || findFile(d, 'main.exe'); if (f) return f; }
-  return null;
+// ---------- voice removed in 2.0: free the ~470 MB whisper left on disk by older versions ----------
+function dropVoice() {
+  for (const d of [path.join(DATA(), 'voice'), path.join(process.resourcesPath || '', 'engine', 'whisper')]) {
+    try { if (fs.existsSync(d)) fs.rmSync(d, { recursive: true, force: true }); } catch {}
+  }
 }
-ipcMain.handle('voice:status', () => ({ exe: !!whisperExe(), model: fs.existsSync(path.join(VOICE(), 'ggml-small.bin')) }));
-ipcMain.handle('voice:setup', async () => {
-  try {
-    fs.mkdirSync(VOICE(), { recursive: true });
-    if (!whisperExe()) {
-      const zip = path.join(VOICE(), 'w.zip');
-      await download(WHISPER_URL, zip, (g, t) => send('voice:progress', { part: 'bin', got: g, total: t }));
-      await unzip(zip, VOICE()); try { fs.unlinkSync(zip); } catch {}
-      if (!whisperExe()) throw new Error('whisper-cli.exe not found');
-    }
-    const m = path.join(VOICE(), 'ggml-small.bin');
-    if (!fs.existsSync(m)) await download('https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin', m, (g, t) => send('voice:progress', { part: 'model', got: g, total: t }));
-    return { ok: true };
-  } catch (e) { return { ok: false, error: String(e.message || e) }; }
-});
-ipcMain.handle('voice:transcribe', async (_e, { wav, lang }) => {
-  const exe = whisperExe(), model = path.join(VOICE(), 'ggml-small.bin');
-  if (!exe || !fs.existsSync(model)) return { ok: false, error: 'not installed' };
-  const f = path.join(app.getPath('temp'), `pulsar-voice-${Date.now()}.wav`);
-  fs.writeFileSync(f, Buffer.from(wav));
-  try {
-    const threads = String(Math.max(2, Math.min(8, require('os').cpus().length - 2)));
-    const out = await new Promise((res, rej) => execFile(exe, ['-m', model, '-f', f, '-l', lang || 'auto', '-nt', '-np', '-t', threads], { windowsHide: true, timeout: 120000, maxBuffer: 4 << 20, cwd: path.dirname(exe) },
-      (e, so, se) => e ? rej(new Error((se || e.message).slice(-300))) : res(so)));
-    return { ok: true, text: String(out).replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim() };
-  } catch (e) { return { ok: false, error: String(e.message || e) }; }
-  finally { try { fs.unlinkSync(f); } catch {} }
-});
 
 // ---------- attach files: read text from txt/code/csv/json/pdf/docx ----------
 const TEXT_EXT = /\.(txt|md|csv|tsv|json|js|mjs|ts|py|html?|css|xml|yml|yaml|log|ini|bat|ps1|sql|java|c|cpp|h|cs|go|rs|php|rb|kt|swift|sh)$/i;
