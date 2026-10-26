@@ -112,5 +112,24 @@ ok('a real English answer is not eaten', /interface/.test(ctx._t2), ctx._t2);
 run("globalThis._th = Object.keys(DESIGN.THEMES);");
 ok('eight design styles', ctx._th.length === 8, ctx._th);
 
+// 10. every request must carry a user turn (llama.cpp answers HTTP 500 without one)
+run("globalThis._u1 = ensureUserTurn([{ role:'system', content:'s' }, { role:'assistant', content:'half a file' }]);");
+ok('a user turn is inserted when missing', ctx._u1.some(m => m.role === 'user'), ctx._u1.map(m => m.role));
+ok('the system message stays first', ctx._u1[0].role === 'system', ctx._u1.map(m => m.role));
+run("globalThis._u2 = ensureUserTurn([{ role:'user', content:'hi' }]);");
+ok('an existing user turn is left alone', ctx._u2.length === 1, ctx._u2.length);
+
+// 11. sizes read properly below a gigabyte ("Докачать · 0.0 ГБ")
+run("globalThis._s = [sizeText(41943040), sizeText(2147483648), sizeText(900)];");
+ok('40 MB does not read as 0.0 GB', /40/.test(ctx._s[0]) && !/0\.0/.test(ctx._s[0]), ctx._s);
+ok('2 GB still reads in gigabytes', /2\.0/.test(ctx._s[1]), ctx._s[1]);
+
+// 12. drawing is recognised in the chat
+run("globalThis._d = ['нарисуй кота', 'draw me a house', 'сгенерируй картинку заката', 'напиши калькулятор'].map(t => DRAW_RE.test(t));");
+ok('draw requests are recognised', ctx._d[0] && ctx._d[1] && ctx._d[2], ctx._d);
+ok('a build request is not mistaken for drawing', ctx._d[3] === false, ctx._d[3]);
+run("globalThis._dp = drawPrompt('нарисуй рыжего кота на крыше');");
+ok('the verb is stripped from the prompt', !/нарису/i.test(ctx._dp) && /кота/.test(ctx._dp), ctx._dp);
+
 console.log(bad ? `\n${bad} CHECK(S) FAILED` : '\nall behaviour checks passed');
 process.exitCode = bad ? 1 : 0;

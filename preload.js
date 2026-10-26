@@ -22,7 +22,7 @@ contextBridge.exposeInMainWorld('pulsar', {
   },
   pc: { list: d => ipcRenderer.invoke('pc:list', d), read: f => ipcRenderer.invoke('pc:read', f) },
   img: {
-    engine: () => ipcRenderer.invoke('img:engine'), have: () => ipcRenderer.invoke('img:have'),
+    engine: () => ipcRenderer.invoke('img:engine'), have: () => ipcRenderer.invoke('img:have'), partials: () => ipcRenderer.invoke('img:partial'),
     download: m => ipcRenderer.invoke('img:download', m), del: id => ipcRenderer.invoke('img:delete', id),
     make: o => ipcRenderer.invoke('img:make', o), cancel: () => ipcRenderer.invoke('img:cancel'),
     open: f => ipcRenderer.invoke('img:open', f), folder: () => ipcRenderer.invoke('img:folder')

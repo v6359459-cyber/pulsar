@@ -31,7 +31,7 @@ No account, no subscription — download a model and start building. Connect clo
 - **Use your own GGUF models** from disk.
 - **Runs in the background** from the tray, with a Windows notification when agents finish.
 - **Light and dark themes.**
-- **Overheat protection.** Set the GPU and CPU limits (75 °C by default) — above them PULSAR slows the model down until the PC cools.
+- **Overheat protection.** Set the GPU and CPU limits (85 °C by default) — above them PULSAR slows the model down until the card has cooled 20 °C below the limit.
 - **Chat history, resumable model downloads, auto-updates** (PULSAR checks for updates right after the intro and installs them by itself).
 - **English and Russian** interface.
 
@@ -58,7 +58,7 @@ With **Auto** on, PULSAR picks the agent for every message and chains them when 
 
 ## Image generation
 
-A separate **Image generation** section that works like the text models: pick a model, download it, run it. Eight models in three groups, from **SD Turbo** (1 GB, draws in seconds even with no GPU) to **Qwen Image 2.1** (8.5 GB, the best at rendering text inside the picture). Every card shows whether your PC can run it. The [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp) engine downloads itself before the first image, and finished pictures stay in a gallery and in their own folder.
+Image models sit in **Models** alongside the text ones: download, press Run, then type "draw a cat" in the chat and the picture appears there. Eight models, from **SD Turbo** (1 GB, draws in seconds even with no GPU) to **Qwen Image 2.1** (8.5 GB, the best at rendering text inside the picture); every card shows whether your PC can run it. One model holds the video memory at a time, so starting a drawing model unloads the text one. The [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp) engine downloads itself before the first image.
 
 ## Models
 
@@ -128,7 +128,7 @@ In PULSAR open **Optimization → Report a problem**. It saves a report file (ve
 - Несколько агентов в одном запросе: один разбирает пример по ссылке, двое пишут код, PULSAR проверяет результат, ещё один агент исправляет ошибки.
 - Перед сохранением на компьютер всегда спрашивает разрешение, а прошлую версию перезаписанного файла всегда можно вернуть.
 - **Режим дизайна:** сайты собираются из 25 готовых блоков в стиле shadcn/ui, 8 стилей (минимализм Apple, тёмный tech / неон, стекло, корпоративный, брутализм, терминал, журнал, градиенты), стили и анимации PULSAR добавляет сам. Можно выключить.
-- **Генерация фото:** отдельный раздел — качаешь модель и рисуешь прямо на ПК, от лёгкой SD Turbo до Qwen Image 2.1, которая умеет надписи по-русски.
+- **Генерация фото:** модели для картинок лежат в «Моделях» — скачал, запустил, пишешь в чате «нарисуй кота». От лёгкой SD Turbo до Qwen Image 2.1, которая умеет надписи по-русски.
 - **Любые облачные API:** вставь ключ и дай имя — PULSAR сам определит сервис и подключит все его модели; какая отвечает, выбираешь в чате. Или модель на ПК, или «Вместе» — обе отвечают, спорят и выдают лучший итог.
 - **Модели видят картинки** (Gemma 4, Qwen3.5 9B и API-модели со зрением): «сделай сайт как на скрине».
 - **Настоящие фото на сайтах** с Openverse или Pexels — сохраняются в папку сайта.
@@ -136,7 +136,7 @@ In PULSAR open **Optimization → Report a problem**. It saves a report file (ve
 - **Ускорители** — маленькие модели-помощники, ответы быстрее в 1,5–2 раза.
 - **Память проекта:** агент видит папку проекта, её файлы и прошлые просьбы, а перед правкой обязан прочитать файл. «Поменяй шрифт на сайте» правит тот самый сайт, а не делает новый.
 - **Удаление проектов** в корзину Windows и **экспорт чата** в файл по правому клику.
-- Защита от перегрева (порог для видеокарты и процессора, по умолчанию 75 °C), защита от зацикливания, история чатов, докачка моделей, автообновления.
+- Защита от перегрева (порог для видеокарты и процессора, по умолчанию 85 °C), защита от зацикливания, история чатов, докачка моделей, автообновления.
 
 **Скачать:** [последняя версия](https://github.com/v6359459-cyber/pulsar/releases/latest). Если Windows предупредит о неизвестном издателе — «Подробнее → Выполнить в любом случае».
 

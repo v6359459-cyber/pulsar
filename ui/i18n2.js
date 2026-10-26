@@ -289,3 +289,17 @@ Object.assign(I18N.en, {
   imgNoPrompt: 'Describe the picture first', imgError: 'Could not draw it',
   imgEngine: 'Downloading the image engine', imgRender: 'Drawing', imgStep: (a, b) => `Drawing · step ${a} of ${b}`
 });
+
+// ---------- 2.2 ----------
+Object.assign(I18N.ru, { contGo: 'Продолжай с того места, где остановился.', chSkip: 'ошибок нет — проверка не нужна', imgCat: 'Рисуют картинки', imgRun: 'Запустить', imgRunning: 'Запущена', imgInChat: 'Напиши в чате «нарисуй …» — PULSAR нарисует этой моделью.' });
+Object.assign(I18N.en, { contGo: 'Continue from where you stopped.', chSkip: 'no problems found — review skipped', imgCat: 'Draw pictures', imgRun: 'Run', imgRunning: 'Running', imgInChat: 'Type "draw …" in the chat and PULSAR will draw with this model.' });
+Object.assign(I18N.ru, {
+  mb: 'МБ', imgCatD: 'рисуют картинки прямо на твоём ПК', imgReady: 'Модель для картинок запущена — пиши в чате «нарисуй …»',
+  imgAgent: 'PULSAR · картинка', imgNoModel: 'Сначала скачай и запусти модель для картинок в разделе «Модели».',
+  imgDone: n => `Нарисовано · ${n}. Нажми на картинку, чтобы открыть.`
+});
+Object.assign(I18N.en, {
+  mb: 'MB', imgCatD: 'draw pictures right on your PC', imgReady: 'Image model is running — type "draw …" in the chat',
+  imgAgent: 'PULSAR · image', imgNoModel: 'Download and run an image model in Models first.',
+  imgDone: n => `Drawn with ${n}. Click the picture to open it.`
+});

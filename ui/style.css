@@ -371,3 +371,10 @@ nav .chip:nth-child(6){animation-delay:.2s}
 .imgcell:hover{transform:translateY(-4px);border-color:var(--line3)}
 .imgcell img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--bg3);display:block}
 .imgcell span{color:var(--muted);padding:0 4px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* a drawn picture inside a chat message */
+.chatimg{all:unset;display:block;cursor:pointer;margin-top:10px;border-radius:18px;overflow:hidden;border:1px solid var(--line);
+  max-width:460px;transition:transform .3s var(--ease),border-color .25s}
+.chatimg:hover{transform:translateY(-3px);border-color:var(--line3)}
+.chatimg img{display:block;width:100%;height:auto}
+/* download buttons line up at the bottom of a card whatever the description length */
+.cardact{margin-top:auto;display:block}

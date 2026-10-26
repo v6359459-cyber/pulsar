@@ -123,7 +123,7 @@ function helperCard(d, i) {
   return `<div class="card fu helper" style="animation-delay:${.14 + i * .04}s">
     <div class="row"><span class="fit fit2">${T('helperTag')}</span><span class="mono small muted">≈${d.size} ${T('gb')}</span></div>
     <div style="font-size:21px;font-weight:400">${esc(d.name)}</div>
-    <div class="small muted" style="line-height:1.5;min-height:40px;font-size:14px">${T('helperD')} <span style="color:#bbb">${esc(helps)}</span></div>${actions}</div>`;
+    <div class="small muted" style="line-height:1.5;min-height:40px;font-size:14px">${T('helperD')} <span style="color:#bbb">${esc(helps)}</span></div><span class="cardact">${actions}</span></div>`;
 }
 function allModels() {
   return [...CATALOG, ...(S.st.customModels || []).map(c => ({ id: c.id, cat: 'mine', name: c.name, path: c.path, size: c.sizeGB || 5, layers: 32, kv: 64, tags: ['general', 'code'], ru: 'Твоя модель с диска', en: 'Your model from disk' }))];
@@ -291,7 +291,7 @@ async function appScreen() {
   P.monitor(S.st.load !== false);
 }
 function renderNav() {
-  const tabs = [['chat', 'tChat'], ['projects', 'tProjects'], ['models', 'tModels'], ['images', 'tImages'], ['agents', 'tAgents'], ['design', 'tDesign'], ['settings', 'tSettings']];
+  const tabs = [['chat', 'tChat'], ['projects', 'tProjects'], ['models', 'tModels'], ['agents', 'tAgents'], ['design', 'tDesign'], ['settings', 'tSettings']];
   const hw = S.st.hw || {}; const [pname] = profile();
   const sp = S.running && S.st.speed && S.st.speed[S.running];
   $('#nav').innerHTML = `<div class="brand"><div class="dot led"></div>PULSAR</div>
@@ -310,7 +310,7 @@ function renderMain() {
   if (!same) { m.classList.remove('swap'); void m.offsetWidth; m.classList.add('swap'); }
   m.style.padding = S.tab === 'chat' ? '48px 56px 28px' : '';
   if (S.tab === 'projects') { m.innerHTML = viewProjects(); loadProjects(); }
-  else m.innerHTML = ({ chat: viewChat, models: viewModels, images: viewImages, agents: viewAgents, design: viewDesign, settings: viewSettings }[S.tab] || viewChat)();
+  else m.innerHTML = ({ chat: viewChat, models: viewModels, agents: viewAgents, design: viewDesign, settings: viewSettings }[S.tab] || viewChat)();
   if (S.tab === 'chat') { hookScroll(); const box = $('#msgs'); toBottom(box); $('#input')?.focus(); showBoost(); showVision(); }
 }
 
@@ -322,17 +322,17 @@ function modelCard(m, p, i) {
   if (d) actions = `<div class="track"><div id="pg-${m.id}" style="width:${d.total ? (d.got / d.total * 100).toFixed(1) : 0}%"></div></div>
     <div class="row small muted"><span class="mono" id="pt-${m.id}">${dlText(d, m)}</span><button class="btn ghost sm" data-act="cancel" data-v="${m.id}">${T('cancel')}</button></div>`;
   else if (have) actions = `<div class="row"><button class="btn sm" style="flex:1" data-act="run" data-v="${m.id}" ${run ? 'disabled' : ''}>${run ? T('running') : T('use')}</button><button class="btn ghost sm" data-act="del" data-v="${m.id}">${T('del')}</button></div>`;
-  else actions = `<button class="btn ghost sm" data-act="dl" data-v="${m.id}">${S.partial[m.id] ? T('resumeDl') + ' · ' + (S.partial[m.id] / 1073741824).toFixed(1) + ' ' + T('gb') : T('download')}</button>`;
+  else actions = `<button class="btn ghost sm" data-act="dl" data-v="${m.id}">${S.partial[m.id] ? T('resumeDl') + ' · ' + sizeText(S.partial[m.id]) : T('download')}</button>`;
   return `<div class="card fu" style="animation-delay:${.1 + i * .04}s;${p.fit < 0 ? 'opacity:.55' : ''}">
     <div class="row"><span class="fit ${fk}">${T(fk)}</span><span class="mono small muted">${m.fresh ? '<span class="newb">' + T('fresh') + '</span>' : ''}≈${m.size} ${T('gb')}</span></div>
     <div style="font-size:21px;font-weight:400">${esc(m.name)}</div>
     ${m.vision ? `<span class="visb">${ico('eye', 12)}${T('seesPics')}</span>` : ''}
-    <div class="small muted" style="line-height:1.5;min-height:40px;font-size:14px">${esc(m[L()])}</div>
-    <div class="mono" style="font-size:12px;color:#aaa;line-height:1.7;border-top:1px solid #1a1a1a;padding-top:12px">${planText(m, p)}</div>${actions}</div>`;
+    <div class="small muted" style="line-height:1.5;font-size:14px">${esc(m[L()])}</div>
+    <div class="mono" style="font-size:12px;color:#aaa;line-height:1.7;border-top:1px solid #1a1a1a;padding-top:12px">${planText(m, p)}</div><span class="cardact">${actions}</span></div>`;
 }
 function viewModels() {
   const cur = S.mcat || 'all';
-  const chips = `<div class="chips fu" style="margin-bottom:28px;animation-delay:.1s"><button class="chip ${cur === 'all' ? 'on' : ''}" data-act="mcat" data-v="all">${T('catAll')}</button>${CATS.map(c => `<button class="chip ${cur === c[0] ? 'on' : ''}" data-act="mcat" data-v="${c[0]}">${T(c[1])}</button>`).join('')}</div>`;
+  const chips = `<div class="chips fu" style="margin-bottom:28px;animation-delay:.1s"><button class="chip ${cur === 'all' ? 'on' : ''}" data-act="mcat" data-v="all">${T('catAll')}</button>${CATS.map(c => `<button class="chip ${cur === c[0] ? 'on' : ''}" data-act="mcat" data-v="${c[0]}">${T(c[1])}</button>`).join('')}<button class="chip ${cur === 'img' ? 'on' : ''}" data-act="mcat" data-v="img">${T('imgCat')}</button></div>`;
   let k = 0;
   const sections = CATS.filter(c => cur === 'all' || cur === c[0]).map(c => {
     const list = CATALOG.filter(m => m.cat === c[0]).map(m => ({ m, p: plan(m) }))
@@ -346,7 +346,10 @@ function viewModels() {
     <button class="card fu addm" data-act="addModel"><span style="font-size:30px;font-weight:200">+</span><span>${T('addModel')}</span><span class="small muted">${T('addModelD')}</span></button></div>`;
   const banner = !S.local.size ? recCard(true) : '';
   const helpSec = `<div class="sec fu" style="animation-delay:.12s">${T('catHelp')} <span style="letter-spacing:0;text-transform:none;color:#555">— ${T('catHelpD')}</span></div><div class="grid">${DRAFTS.map(helperCard).join('')}</div>`;
-  return `<h2 class="fu">${T('tModels')}</h2><p class="sub fu" style="animation-delay:.08s;margin-bottom:20px">${T('modelsSub')}</p>${banner}${chips}${cur === 'all' ? mineSec : ''}${sections}${cur === 'all' ? helpSec : ''}`;
+  const imgSec = `<div class="sec fu" style="animation-delay:.12s">${T('imgCat')} <span style="letter-spacing:0;text-transform:none;color:#555">— ${T('imgCatD')}</span></div>
+    <div class="grid">${IMG_CATALOG.slice().sort((a, b) => imgFit(b) - imgFit(a) || a.size - b.size).map((m, i) => imgCard(m, i)).join('')}</div>`;
+  const showImg = cur === 'all' || cur === 'img';
+  return `<h2 class="fu">${T('tModels')}</h2><p class="sub fu" style="animation-delay:.08s;margin-bottom:20px">${T('modelsSub')}</p>${banner}${chips}${cur === 'all' ? mineSec : ''}${cur === 'img' ? '' : sections}${showImg ? imgSec : ''}${cur === 'all' ? helpSec : ''}`;
 }
 function kimiCard() {
   const k = (S.st.apis || []).find(a => a.cloud === 'kimi');
@@ -389,7 +392,7 @@ P.onProgress(({ id, got, total }) => {
     const k = id.slice(4);
     if (!S.imgDl[k]) return;
     S.imgDl[k] = { got, total: total || S.imgDl[k].total };
-    if (S.tab === 'images') { S._lastTab = 'images'; renderMain(); }
+    if (S.tab === 'models') { S._lastTab = 'models'; renderMain(); }
     return;
   }
   if (!S.dl[id]) return; S.dl[id] = { got, total: total || S.dl[id].total };
@@ -508,8 +511,8 @@ function optRows() {
     ],
     heat: [
       ['heat', T('oHeat'), T('oHeatD'), S.st.heat !== false ? T('on') : T('off')],
-      ['heatGpu', T('oHeatGpu'), T('oHeatGpuD'), `${S.st.gpuLimit || 75}°C`],
-      ['heatCpu', T('oHeatCpu'), T('oHeatCpuD'), `${S.st.cpuLimit || 75}°C`]
+      ['heatGpu', T('oHeatGpu'), T('oHeatGpuD'), `${S.st.gpuLimit || 85}°C`],
+      ['heatCpu', T('oHeatCpu'), T('oHeatCpuD'), `${S.st.cpuLimit || 85}°C`]
     ],
     general: [
       ['lang', T('oLang'), '', L() === 'ru' ? 'Русский' : 'English'],
@@ -556,7 +559,7 @@ async function toggleOpt(k) {
   if (k === 'ws') { S.ws = await P.ws.choose(); Sound.tick(1500); renderMain(); return; }
   if (k === 'memory') await save({ memory: [] });
   if (k === 'spec') await save({ spec: S.st.spec === false });
-  if (k === 'heatGpu' || k === 'heatCpu') { const key = k === 'heatGpu' ? 'gpuLimit' : 'cpuLimit', seq = [65, 70, 75, 80, 85, 90]; await save({ [key]: seq[(seq.indexOf(S.st[key] || 75) + 1) % seq.length] }); Sound.tick(1500); renderMain(); return; }
+  if (k === 'heatGpu' || k === 'heatCpu') { const key = k === 'heatGpu' ? 'gpuLimit' : 'cpuLimit', seq = [70, 75, 80, 85, 90, 95]; await save({ [key]: seq[(seq.indexOf(S.st[key] || 85) + 1) % seq.length] }); Sound.tick(1500); renderMain(); return; }
   if (k === 'heat') { await save({ heat: S.st.heat === false }); Sound.tick(1500); renderMain(); return; }
   if (k === 'lang') { await save({ lang: L() === 'ru' ? 'en' : 'ru' }); renderNav(); }
   await save({ opt: o }); Sound.tick(1500); renderMain();
@@ -635,70 +638,74 @@ function viewDesign() {
 }
 
 // ---------- image generation ----------
-S.imgDl = {}; S.imgHave = new Set(); S.imgOut = [];
-const imgModel = () => IMG_CATALOG.find(m => m.id === (S.st.imgModel || '')) || null;
+S.imgDl = {}; S.imgHave = new Set(); S.imgOut = []; S.imgPartial = {};
+const imgModel = () => IMG_CATALOG.find(m => m.id === (S.imgRunning || '')) || null;
 function imgCard(m, i) {
-  const fit = imgFit(m), d = S.imgDl[m.id], have = S.imgHave.has(m.id), cur = S.st.imgModel === m.id;
+  const fit = imgFit(m), d = S.imgDl[m.id], have = S.imgHave.has(m.id), run = S.imgRunning === m.id;
   const fk = fit === 2 ? 'fit2' : fit === 1 ? 'fit1' : fit === 0 ? 'fit0' : 'fitx';
   let actions;
   if (d) actions = `<div class="track"><div style="width:${d.total ? (d.got / d.total * 100).toFixed(1) : 0}%"></div></div>
-    <div class="row small muted"><span class="mono">${d.total ? ((d.got / 1073741824).toFixed(1) + ' / ' + (d.total / 1073741824).toFixed(1) + ' ' + T('gb')) : T('loading')}</span><button class="btn ghost sm" data-act="imgCancelDl" data-v="${m.id}">${T('cancel')}</button></div>`;
-  else if (have) actions = `<div class="row"><button class="btn sm" style="flex:1" data-act="imgUse" data-v="${m.id}" ${cur ? 'disabled' : ''}>${cur ? T('imgChosen') : T('imgUse')}</button><button class="btn ghost sm" data-act="imgDel" data-v="${m.id}">${T('del')}</button></div>`;
-  else actions = `<button class="btn ghost sm" data-act="imgDl" data-v="${m.id}">${T('download')}</button>`;
-  return `<div class="card fu ${cur ? 'on' : ''}" style="animation-delay:${.1 + i * .05}s;cursor:default">
+    <div class="row small muted"><span class="mono">${sizeText(d.got)}${d.total ? ' / ' + sizeText(d.total) : ''}</span><button class="btn ghost sm" data-act="imgCancelDl" data-v="${m.id}">${T('cancel')}</button></div>`;
+  else if (have) actions = `<div class="row"><button class="btn sm" style="flex:1" data-act="imgUse" data-v="${m.id}" ${run ? 'disabled' : ''}>${run ? T('imgRunning') : T('imgRun')}</button><button class="btn ghost sm" data-act="imgDel" data-v="${m.id}">${T('del')}</button></div>`;
+  else actions = `<button class="btn ghost sm" data-act="imgDl" data-v="${m.id}">${S.imgPartial && S.imgPartial[m.id] ? T('resumeDl') + ' · ' + sizeText(S.imgPartial[m.id]) : T('download')}</button>`;
+  return `<div class="card fu ${run ? 'on' : ''}" style="animation-delay:${.1 + i * .04}s;cursor:default">
     <div class="row"><span style="font-size:20px;font-weight:400">${esc(m.name)}${m.fresh ? `<span class="newb" style="margin-left:10px">new</span>` : ''}</span><span class="${fk}" style="padding:2px 10px;border-radius:10px;font-size:12px">${T(fit === 2 ? 'fit2' : fit === 1 ? 'fit1' : fit === 0 ? 'fit0' : 'fitx')}</span></div>
     <span class="muted" style="font-size:14px;line-height:1.5">${esc(m[L()] || m.ru)}</span>
     <span class="mono small muted">${m.size} ${T('gb')} · ${m.w}×${m.h} · ${T('imgSteps')(m.steps)}</span>
-    ${actions}</div>`;
-}
-function viewImages() {
-  const cur = imgModel(), st = S.imgStatus;
-  const busy = !!S.imgBusy;
-  const form = cur ? `<div class="sec fu" style="animation-delay:.06s">${T('imgMake')} · ${esc(cur.name)}</div>
-    <div class="fu imgform" style="animation-delay:.08s">
-      <textarea id="imgP" rows="3" placeholder="${T('imgPh')}" ${busy ? 'disabled' : ''}>${esc(S.imgPrompt || '')}</textarea>
-      <div class="row" style="gap:10px;flex-wrap:wrap;justify-content:flex-start">
-        <select class="pick" data-act="imgSize">${['512x512', '768x768', '1024x1024', '1024x576', '576x1024'].map(x => `<option value="${x}" ${(S.st.imgSize || `${cur.w}x${cur.h}`) === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
-        <button class="btn sm" data-act="${busy ? 'imgStop' : 'imgGo'}">${busy ? T('stop') : T('imgGo')}</button>
-        <button class="btn ghost sm" data-act="imgFolder">${T('imgFolder')}</button>
-      </div>
-      ${busy ? statusHTML(st && st.stage === 'engine' ? T('imgEngine') : st && st.stage === 'unpack' ? T('eUnpack') : st && st.step ? T('imgStep')(st.step, st.total) : T('imgRender')) : ''}
-    </div>
-    ${S.imgOut.length ? `<div class="imggrid fu" style="animation-delay:.1s">${S.imgOut.slice(0, 12).map((o, i) => `<button class="imgcell" data-act="imgShow" data-v="${esc(o.file)}" style="animation-delay:${i * .04}s"><img src="${esc(o.url)}" alt=""><span class="mono small">${esc((o.prompt || '').slice(0, 60))}</span></button>`).join('')}</div>` : ''}` : '';
-  const groups = IMG_CATS.map(c => {
-    const list = IMG_CATALOG.filter(m => m.cat === c[0]).sort((a, b) => imgFit(b) - imgFit(a));
-    return `<div class="sec fu">${T(c[1])}</div><div class="grid">${list.map((m, i) => imgCard(m, i)).join('')}</div>`;
-  }).join('');
-  return `<h2 class="fu">${T('tImages')}</h2><p class="sub fu" style="animation-delay:.04s">${T('imgSub')}</p>
-    ${form}<div style="margin-top:${cur ? 34 : 0}px">${groups}</div>`;
+    ${run ? `<span class="small muted">${T('imgInChat')}</span>` : ''}
+    <span class="cardact">${actions}</span></div>`;
 }
 async function imgDownload(id) {
   const m = IMG_CATALOG.find(x => x.id === id); if (!m || S.imgDl[id]) return;
   if (imgFit(m) < 0 && !confirm(T('warnHeavy'))) return;
-  S.imgDl[id] = { got: 0, total: 0 }; if (S.tab === 'images') { S._lastTab = 'images'; renderMain(); }
+  S.imgDl[id] = { got: 0, total: 0 }; if (S.tab === 'models') { S._lastTab = 'models'; renderMain(); }
   const r = await P.img.download({ id, repos: m.repos, quant: 'q4' });
   delete S.imgDl[id];
+  S.imgPartial = await P.img.partials().catch(() => S.imgPartial);
   if (r.ok) { S.imgHave.add(id); Sound.done(); if (!S.st.imgModel) await save({ imgModel: id }); }
   else if (!/abort/i.test(r.error || '')) toast(T('dlError') + ': ' + r.error);
-  if (S.tab === 'images') { S._lastTab = 'images'; renderMain(); }
+  if (S.tab === 'models') { S._lastTab = 'models'; renderMain(); }
 }
-async function imgGenerate() {
-  const m = imgModel(); if (!m || S.imgBusy) return;
-  const prompt = ($('#imgP')?.value || '').trim();
-  if (!prompt) { toast(T('imgNoPrompt')); return; }
-  S.imgPrompt = prompt; S.imgBusy = true; S.imgStatus = null; S._lastTab = 'images'; renderMain(); Sound.soft();
-  const [w, h] = (S.st.imgSize || `${m.w}x${m.h}`).split('x').map(Number);
-  const r = await P.img.make({ id: m.id, prompt, steps: m.steps, cfg: m.cfg, w, h });
-  S.imgBusy = false; S.imgStatus = null;
-  if (r.ok) { S.imgOut.unshift({ ...r, prompt }); Sound.done(); }
-  else if (!/abort|kill/i.test(r.error || '')) toast(T('imgError') + ': ' + r.error);
-  S._lastTab = 'images'; renderMain();
+// Only one model holds the video memory, so starting a drawing model stops the text one.
+async function runImgModel(id) {
+  if (S.imgRunning === id) return;
+  if (S.running) { await P.stop(); S.running = null; S.engine = null; S.sel = isApi(S.sel) || isTog(S.sel) ? S.sel : null; }
+  S.imgRunning = id; await save({ imgModel: id });
+  Sound.tick(1500); S._lastTab = 'models'; renderMain(); renderNav();
+  toast(T('imgReady'));
+}
+// "нарисуй кота" in the chat: recognised here, drawn by whichever image model is running
+// Anchored at the start and built from stems ("картинк" matches картинку/картинки), so it needs
+// no trailing boundary — and \b would not work here anyway, being blind to Cyrillic.
+const DRAW_RE = /^\s*(нарису(й|йте)|сгенерируй (картинк|изображени|фото|фотк|арт)|сделай (картинк|изображени)|изобрази|draw( me)?|generate an? (image|picture|photo)|make an? (image|picture))/i;
+const drawPrompt = t => t.replace(DRAW_RE, '').replace(/^[\s,:—-]+/, '').trim();
+function drawStatus(st) {
+  return !st ? T('imgRender')
+    : st.stage === 'engine' ? T('imgEngine')
+    : st.stage === 'unpack' ? T('eUnpack')
+    : st.step ? T('imgStep')(st.step, st.total) : T('imgRender');
+}
+// draws into the chat as its own message, with the picture attached when it is done
+async function drawInChat(text) {
+  const m = imgModel();
+  const msg = { role: 'assistant', agent: T('imgAgent'), content: '', live: true, status: T('imgRender') };
+  S.msgs.push(msg); const idx = S.msgs.length - 1; addMsg(idx);
+  if (!m) { msg.live = false; msg.status = null; msg.content = T('imgNoModel'); paint(idx); Sound.tick(700); return; }
+  const prompt = drawPrompt(text) || text.trim();
+  S.imgBusy = true; S.imgPaint = { msg, idx };
+  const r = await P.img.make({ id: m.id, prompt, steps: m.steps, cfg: m.cfg, w: m.w, h: m.h });
+  S.imgBusy = false; S.imgPaint = null;
+  msg.live = false; msg.status = null;
+  if (r.ok) { msg.image = r.url; msg.file = r.file; msg.content = T('imgDone')(m.name); Sound.done(); }
+  else { msg.content = T('imgError') + ': ' + r.error; Sound.tick(700); }
+  paint(idx);
 }
 P.onImg(st => {
   S.imgStatus = st;
-  if (S.tab !== 'images' || !S.imgBusy) return;
-  const el = document.querySelector('.imgform .pstat');
-  if (el) el.textContent = st.stage === 'engine' ? T('imgEngine') : st.stage === 'unpack' ? T('eUnpack') : st.step ? T('imgStep')(st.step, st.total) : T('imgRender');
+  const t = S.imgPaint;
+  if (!t) return;
+  t.msg.status = drawStatus(st);
+  paint(t.idx);
 });
 
 // ---------- projects ----------
@@ -832,6 +839,7 @@ function liveStatus(c) {
   return T('stWriting');
 }
 // three pulsing dots carry "working"; the words sit beside them, small and quiet
+const sizeText = b => b >= 1073741824 ? (b / 1073741824).toFixed(1) + ' ' + T('gb') : Math.max(1, Math.round(b / 1048576)) + ' ' + T('mb');
 const statusHTML = txt => `<div class="status"><span class="pdots" aria-hidden="true"><i></i><i></i><i></i></span><span class="pstat">${esc(txt)}</span></div>`;
 
 function viewChat() {
@@ -872,10 +880,17 @@ function agentCounts(parts, onlyWork) {
   for (const p of parts) { if (onlyWork && p.status !== 'work') continue; const n = p.name.replace(/ #\d+$/, ''); c[n] = (c[n] || 0) + 1; }
   return Object.entries(c).map(([n, k]) => k > 1 ? `${n} ×${k}` : n);
 }
+function paintPill(auto) {
+  const pill = $('#apill');
+  if (!pill || !(auto !== undefined ? auto : S.st.autoAgent !== false)) return;
+  pill.textContent = S.lastAgent || T('autoAgentPick');
+  pill.classList.remove('flash'); void pill.offsetWidth; pill.classList.add('flash');
+}
 function chainHTML(m) {
   const ch = m.chain; const cur = ch.stages.findIndex(s => s.state === 'work');
   const steps = ch.stages.map((s, i) => `<span class="cstep ${s.state}">${s.state === 'work' ? '<span class="shimmer">' + T(STAGES[s.id]) + '</span>' : T(STAGES[s.id])}</span>${i < ch.stages.length - 1 ? '<span class="cline ' + (s.state === 'done' ? 'done' : '') + '"></span>' : ''}`).join('');
-  return `<div class="chain"><div class="csteps">${steps}</div><div class="cnow"><span class="dot led ${ch.stages.some(s => s.state === 'work') ? '' : 'off'}"></span><span class="cnt">${chainNow(m)}</span></div></div>`;
+  const busy = ch.stages.some(s => s.state === 'work');
+  return `<div class="chain"><div class="csteps">${steps}</div><div class="cnow">${busy ? '<span class="pdots" aria-hidden="true"><i></i><i></i><i></i></span>' : '<span class="dot led off"></span>'}<span class="cnt">${chainNow(m)}</span></div></div>`;
 }
 function chainNow(m) {
   const ch = m.chain; const cur = ch.stages.findIndex(s => s.state === 'work');
@@ -893,6 +908,7 @@ function msgInner(m) {
   if (m.chain) return chainHTML(m) + `<div class="mrest">${chainRest(m)}</div>`;
   const extra = (m.extra || []).map(a => actLine(a.kind, a.arg, a)).join('');
   let ctx = { acts: m.actions, k: 0, only: m.parts ? ['file', 'run'] : null };
+  if (m.image) return `<div class="alabel">${esc(m.agent || '')}</div><button class="chatimg" data-act="imgShow" data-v="${esc(m.file)}"><img src="${esc(m.image)}" alt=""></button><div class="small muted" style="margin-top:8px">${esc(m.content || '')}</div>`;
   if (!m.parts) return (m.agent ? `<div class="alabel">${esc(m.agent)}</div>` : '') + (m.content ? md(stripMem(m.content), ctx) : '') + (m.memNote ? `<div class="memnote">${ico('check', 12)}<span>${esc(m.memNote)}</span></div>` : '') + extra + askHTML(m.ask) + (m.live ? statusHTML(m.status || liveStatus(m.content)) : ttsBtn(m));
   const st = { wait: T('waiting'), work: T('working'), done: T('done'), error: T('sError') };
   if (m.debate) ctx = { acts: m.actions, k: 0 };
@@ -950,7 +966,12 @@ function patchChain(el, m) {
     if (st.className !== cls) { st.className = cls; st.innerHTML = s.state === 'work' ? '<span class="shimmer">' + T(STAGES[s.id]) + '</span>' : T(STAGES[s.id]); }
     if (lines[k]) { const lc = 'cline' + (s.state === 'done' ? ' done' : ''); if (lines[k].className !== lc) lines[k].className = lc; }
   });
-  const dot = el.querySelector('.cnow > .dot'); if (dot) dot.classList.toggle('off', !m.chain.stages.some(s => s.state === 'work'));
+  const busyNow = m.chain.stages.some(s => s.state === 'work');
+  const mark = el.querySelector('.cnow > .dot, .cnow > .pdots');
+  if (mark) {
+    const want = busyNow ? 'pdots' : 'dot';
+    if (!mark.classList.contains(want)) mark.outerHTML = busyNow ? '<span class="pdots" aria-hidden="true"><i></i><i></i><i></i></span>' : '<span class="dot led off"></span>';
+  }
   const cnt = el.querySelector('.cnow > .cnt'); if (!cnt) return false; setHTML(cnt, chainNow(m));
   return true;
 }
@@ -993,7 +1014,16 @@ P.onChunk(({ id, data }) => live[id] && live[id].chunk(data));
 P.onChatEnd(({ id, error }) => live[id] && live[id].end(error));
 let reqSeq = 0;
 const textOnly = msgs => msgs.map(m => Array.isArray(m.content) ? { ...m, content: m.content.filter(c => c.type === 'text').map(c => c.text).join('\n') + '\n[The user attached a picture you cannot see.]' } : m);
+// Chat templates refuse a request with no user turn ("No user query found in messages" -> HTTP 500).
+// One missing user message used to kill a whole build, so guarantee one here for every call.
+function ensureUserTurn(messages) {
+  if (messages.some(m => m.role === 'user')) return messages;
+  const sys = messages.findIndex(m => m.role === 'system');
+  const at = sys >= 0 ? sys + 1 : 0;
+  return [...messages.slice(0, at), { role: 'user', content: T('contGo') }, ...messages.slice(at)];
+}
 function stream(messages, signal, onDelta, extra, meta) {
+  messages = ensureUserTurn(messages);
   const t = (meta && meta.tgt) || target(); const id = 'r' + (++reqSeq);
   const sees = t.local ? !!(S.visionOn && findM(S.running)?.vision) : VISION_API.test(t.model || '');
   if (!sees) messages = textOnly(messages);
@@ -1222,7 +1252,7 @@ const SAVE_RE = /(сохрани|сохранить|сохраняй|на пк|�
 // "калькулятор напиши" are the same ask. The old rule only matched verb-then-noun, so the
 // reversed form fell through to plain chat and nothing got built.
 const BUILD_VERB = /(сделай|сделать|создай|создать|напиши|написать|сгенерируй|собери|собрать|построй|сверстай|свёрстай|переделай|доработай|улучши|запили|накидай|make|build|create|write|code|generate)/i;
-const BUILD_THING = /(сайт|страниц|лендинг|игр[уаы]?\b|игру|программ|скрипт|бот[ае]?\b|бота|калькулятор|приложени|таймер|секундомер|todo|тудушк|список дел|парсер|конвертер|генератор|форм[уы]\b|анкет|викторин|тест\b|лаунчер|утилит|site|page|landing|game|program|script|bot|calculator|timer|parser|converter|generator|quiz|form\b|app\b)/i;
+const BUILD_THING = /(сайт|страниц|лендинг|игр[уаы]?(?![\wа-яё])|программ|скрипт|бот[ае]?(?![\wа-яё])|калькулятор|приложени|таймер|секундомер|todo|тудушк|список дел|парсер|конвертер|генератор|форм[уы](?![\wа-яё])|анкет|викторин|тест(?![\wа-яё])|лаунчер|утилит|site|page|landing|game|program|script|bot\b|calculator|timer|parser|converter|generator|quiz|form\b|app\b)/i;
 const BUILD_RE = new RegExp(`(${BUILD_VERB.source}).{0,60}(${BUILD_THING.source})|(${BUILD_THING.source}).{0,60}(${BUILD_VERB.source})`, 'i');
 const SEARCH_RE = /(найди|поищи|загугли|что нового|новост|курс|погода|search|look up|find)/i;
 const TR = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya' };
@@ -1825,6 +1855,12 @@ async function runChain(text, signal, plan) {
   stage('code');
   const jobs = pages.map((pg, k) => part(coder[1] + (pages.length > 1 ? ' #' + (k + 1) : ''), plan.site ? `${pg.file}${pg.title ? ' — ' + pg.title : ''}` : T('chCode'), 'wait'));
   const slots = () => realSlots(S.running) || 1; // one source of truth, same number the model card shows
+  // the pill said "×2" from the start; correct it to however many coders actually run now
+  {
+    const n = Math.min(slots(), pages.length);
+    S.lastAgent = plan.urls.length || plan.research ? 'PULSAR IN BROWSER → PULSAR CODE' : 'PULSAR CODE' + (n > 1 ? ' ×' + n : '');
+    paintPill();
+  }
   const codes = await limitAll(pages, slots(), async (pg, k) => {
     await waitCool();
     const p = jobs[k]; p.status = 'work'; paint(idx);
@@ -1850,7 +1886,7 @@ async function runChain(text, signal, plan) {
     }
     await stream([{ role: 'system', content: sys }, ...shots, { role: 'user', content: withPics(user) }], signal, c => { p.content += c; paint(idx); }, { temperature: 0.3 }, meta);
     if (meta.finish === 'loop') p.content = p.content.slice(0, p.content.length - (meta.loopCut || 0));
-    for (let r = 0; r < 4 && meta.finish === 'length'; r++) {
+    for (let r = 0; r < 2 && meta.finish === 'length'; r++) {
       meta.finish = null;
       await stream([{ role: 'system', content: sys + ' Continue exactly where it stopped, no repetition.' }, { role: 'user', content: user }, { role: 'assistant', content: p.content.slice(-6000) }], signal, c => { p.content += c; paint(idx); }, null, meta);
     }
@@ -1862,20 +1898,30 @@ async function runChain(text, signal, plan) {
   await limitAll(codes.map((c, k) => ({ c, k })).filter(x => x.c), slots(), async ({ c, k }) => {
     await waitCool();
     const label = plan.site ? pages[k].file : T('chCode');
+    // The review stage costs a full generation per round, so it only starts when the machine
+    // actually found something. A clean 30-line calculator now finishes instead of sitting here.
+    const first = await autoCheck(c, plan.site);
+    if (!first.length) { part(coder[1] + ' · ' + T('chReview') + (pages.length > 1 ? ' #' + (k + 1) : ''), `${label} · ${T('chSkip')}`, 'done'); return; }
     const p = part(coder[1] + ' · ' + T('chReview') + (pages.length > 1 ? ' #' + (k + 1) : ''), label);
     // The reviewer used to be told to fix "anything else that is broken", ran three rounds and
     // never checked whether it helped — so it rewrote working code and sometimes looped.
     // Now: machine-found syntax problems only, two rounds, and every round must actually reduce
     // the problem count or the previous version is put back.
-    let cur = c, fixedAny = false, problems = await autoCheck(cur, plan.site);
+    let cur = c, fixedAny = false, problems = first;
     const started = problems.length;
-    for (let round = 0; round < 2 && problems.length; round++) {
+    const until = Date.now() + 90000; // hard ceiling, so a stubborn file cannot eat the session
+    for (let round = 0; round < 2 && problems.length && Date.now() < until; round++) {
       p.task = `${label} · ${T('chFixing')} ${round + 1}`; p.content += `\n${problems.join('\n')}\n`; paint(idx);
       await waitCool();
       const meta = {}; let out = '';
       await stream([{ role: 'system', content: `You fix syntax errors in code. Fix ONLY the problems listed by the user, nothing else. Do not refactor, do not rename, do not restyle, do not add or remove features, do not "improve" anything. Return the COMPLETE file in ONE code block with every other line byte-identical to the input. Answer in ${lang}.` },
         { role: 'user', content: `Fix exactly these problems and change nothing else:\n- ${problems.join('\n- ')}\n\nCode:\n\`\`\`${cur.lang}\n${cur.code}\n\`\`\`` }], signal, ch => { out += ch; p.content += ch; paint(idx); }, { temperature: 0.1 }, meta);
-      for (let r = 0; r < 3 && meta.finish === 'length'; r++) { meta.finish = null; await stream([{ role: 'system', content: 'Continue the code exactly where it stopped. No repetition.' }, { role: 'assistant', content: out.slice(-6000) }], signal, ch => { out += ch; p.content += ch; paint(idx); }, { temperature: 0.1 }, meta); }
+      for (let r = 0; r < 2 && meta.finish === 'length'; r++) {
+        meta.finish = null;
+        await stream([{ role: 'system', content: 'Continue the code exactly where it stopped. No repetition.' },
+          { role: 'user', content: `Continue this ${cur.lang} file from where it stops. Output only the continuation.` },
+          { role: 'assistant', content: out.slice(-6000) }], signal, ch => { out += ch; p.content += ch; paint(idx); }, { temperature: 0.1 }, meta);
+      }
       const fixed = extractCode(out, plan.site);
       if (!fixed || fixed.code.length < cur.code.length * 0.8) break; // it dropped half the file: keep what we had
       const after = await autoCheck(fixed, plan.site);
@@ -2011,6 +2057,14 @@ async function sendMsg() {
     ta.value = ''; S.msgs.push({ role: 'user', content: typed, shown: typed }); addMsg(S.msgs.length - 1);
     if (!S.panel) openPanel(); S.msgs.push({ role: 'assistant', content: T('browserOpened') }); addMsg(S.msgs.length - 1); Sound.done(); saveChat().catch(() => {}); return;
   }
+  if (!all.length && DRAW_RE.test(typed) && (S.imgRunning || S.imgHave.size)) {
+    ta.value = ''; ta.style.height = 'auto';
+    S.msgs.push({ role: 'user', content: typed, shown: typed }); addMsg(S.msgs.length - 1);
+    const ctl0 = new AbortController(); S.streaming = ctl0; setSendBtn(); lockComposer(true);
+    await drawInChat(typed).catch(() => {});
+    S.streaming = null; setSendBtn(); lockComposer(false); saveChat().catch(() => {});
+    return;
+  }
   const url = all.length ? null : openIntent(typed);
   if (url) S.lastLinks = [url];
   if (!haveModel() && !url) { toast(T('chatNoModel')); return; }
@@ -2032,7 +2086,7 @@ async function sendMsg() {
   const par = realSlots(S.running) || 1;
   S.lastAgent = chain ? (plan.urls.length || plan.research ? 'PULSAR IN BROWSER → PULSAR CODE' : 'PULSAR CODE' + (par > 1 ? ' ×' + par : '')) : ag.name;
   S.lastAgentId = chain ? 'coder' : ag.id;
-  const pill = $('#apill'); if (pill && auto) { pill.textContent = S.lastAgent; pill.classList.remove('flash'); void pill.offsetWidth; pill.classList.add('flash'); }
+  paintPill(auto);
   try {
     if (chain && haveModel()) await runChain(text, ctl.signal, plan);
     else if (url) {
@@ -2086,7 +2140,7 @@ root.addEventListener('click', async e => {
     case 'setLang': await save({ lang: v }); document.documentElement.lang = v; Sound.tick(1500); renderNav(); S._lastTab = null; renderMain(); drawTabs(); break;
     case 'tab': S.tab = v; Sound.tick(1200); renderNav(); renderMain(); break;
     case 'dl': downloadModel(v); break;
-    case 'cancel': P.cancel(v); break;
+    case 'cancel': P.cancel(v); setTimeout(async () => { S.partial = await P.partials().catch(() => S.partial); if (S.tab === 'models') { S._lastTab = 'models'; renderMain(); } }, 600); break;
     case 'run': runModel(v); break;
     case 'del': await P.deleteModel(v); S.local.delete(v); if (S.running === v) S.running = null; renderNav(); renderMain(); break;
     case 'opt': toggleOpt(v); break;
@@ -2158,8 +2212,8 @@ root.addEventListener('click', async e => {
     case 'projDel': await deleteProject(v); break;
     case 'imgDl': imgDownload(v); break;
     case 'imgCancelDl': await P.img.cancel(); break;
-    case 'imgDel': await P.img.del(v); S.imgHave.delete(v); if (S.st.imgModel === v) await save({ imgModel: null }); S._lastTab = 'images'; renderMain(); break;
-    case 'imgUse': await save({ imgModel: v }); Sound.tick(1500); S._lastTab = 'images'; renderMain(); break;
+    case 'imgDel': await P.img.del(v); S.imgHave.delete(v); if (S.st.imgModel === v) await save({ imgModel: null }); S._lastTab = 'models'; renderMain(); break;
+    case 'imgUse': await runImgModel(v); break;
     case 'imgGo': imgGenerate(); break;
     case 'imgStop': await P.img.cancel(); break;
     case 'imgFolder': P.img.folder(); break;
@@ -2239,7 +2293,8 @@ function applyTheme() { document.documentElement.classList.toggle('light', S.st.
 (async () => {
   S.st = await P.getSettings(); applyTheme();
   P.version().then(v => { S.version = v; }).catch(() => {});
-  P.img.have().then(l => { S.imgHave = new Set(l); }).catch(() => {});
+  P.img.have().then(l => { S.imgHave = new Set(l); if (S.st.imgModel && l.includes(S.st.imgModel)) S.imgRunning = S.st.imgModel; }).catch(() => {});
+  P.img.partials().then(o => { S.imgPartial = o; }).catch(() => {});
   if (S.st.apis) {
     // 1.x stored one entry per model; 2.0 stores one entry per key with all of its models
     const merged = [];

@@ -331,15 +331,42 @@ ipcMain.handle('monitor:set', (_e, on) => {
 const SD_TAG = 'master-920-2f88688';
 const SD_DIR = () => path.join(DATA(), 'sd');
 const IMG_DIR = () => path.join(DATA(), 'images');
+// The release has shipped the binary as sd.exe, sd-cli.exe and stable-diffusion.exe at
+// different times, sometimes inside a nested folder — so look for any of them, recursively,
+// instead of one fixed name.
+function findAnyExe(dir, names) {
+  let out = null;
+  const walk = d => {
+    if (out) return;
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      if (out) return;
+      const q = path.join(d, e.name);
+      if (e.isDirectory()) walk(q);
+      else if (names.some(n => e.name.toLowerCase() === n)) out = q;
+    }
+  };
+  try { walk(dir); } catch {}
+  return out;
+}
+const SD_EXES = ['sd.exe', 'sd-cli.exe', 'stable-diffusion.exe', 'sdcpp.exe'];
 const sdExe = () => {
   for (const d of [path.join(process.resourcesPath || '', 'engine', 'sd'), path.join(__dirname, 'engine', 'sd'), SD_DIR()]) {
-    try { if (fs.existsSync(d)) { const f = findFile(d, 'sd.exe'); if (f) return f; } } catch {}
+    try { if (fs.existsSync(d)) { const f = findAnyExe(d, SD_EXES); if (f) return f; } } catch {}
   }
   return null;
 };
+// when nothing matched, say what actually came out of the archive
+function listExes(dir) {
+  const out = [];
+  const walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const q = path.join(d, e.name); if (e.isDirectory()) walk(q); else if (/\.exe$/i.test(e.name)) out.push(path.relative(dir, q)); } };
+  try { walk(dir); } catch {}
+  return out;
+}
 async function sdAsset(tag) {
-  const r = await fetch(`https://api.github.com/repos/leejet/stable-diffusion.cpp/releases/tags/${tag}`, { headers: { 'User-Agent': 'PULSAR' } });
-  if (!r.ok) throw new Error('release ' + tag + ' not found (' + r.status + ')');
+  // pinned release first; if that tag is gone, fall back to the current one rather than failing
+  let r = await fetch(`https://api.github.com/repos/leejet/stable-diffusion.cpp/releases/tags/${tag}`, { headers: { 'User-Agent': 'PULSAR' } });
+  if (!r.ok) r = await fetch('https://api.github.com/repos/leejet/stable-diffusion.cpp/releases/latest', { headers: { 'User-Agent': 'PULSAR' } });
+  if (!r.ok) throw new Error('не удалось получить список сборок движка (' + r.status + ')');
   const assets = (await r.json()).assets || [];
   const win = assets.filter(a => /win/i.test(a.name) && /\.zip$/i.test(a.name));
   // prefer a Vulkan build (works on NVIDIA, AMD and Intel), else any CPU/avx build
@@ -358,10 +385,18 @@ async function ensureSd() {
   await unzip(zip, SD_DIR());
   try { fs.unlinkSync(zip); } catch {}
   const exe = sdExe();
-  if (!exe) throw new Error('sd.exe not found after unpacking');
+  if (!exe) {
+    const found = listExes(SD_DIR());
+    throw new Error('в архиве ' + a.name + ' нет известного файла движка. Найденные .exe: ' + (found.join(', ') || 'ни одного') + '. Пришли эту строку разработчику.');
+  }
   return exe;
 }
 ipcMain.handle('img:engine', async () => { try { return { ok: true, path: await ensureSd() }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
+ipcMain.handle('img:partial', () => {
+  const o = {}; const d = path.join(DIRS().models, 'img');
+  try { for (const f of fs.readdirSync(d)) if (f.endsWith('.gguf.part')) o[f.replace(/\.gguf\.part$/, '')] = fs.statSync(path.join(d, f)).size; } catch {}
+  return o;
+});
 ipcMain.handle('img:have', () => {
   const d = path.join(DIRS().models, 'img');
   try { return fs.readdirSync(d).filter(f => f.endsWith('.gguf')).map(f => f.replace(/\.gguf$/, '')); } catch { return []; }
@@ -673,10 +708,16 @@ async function keyWorks(p, key, models) {
     });
     if (r.ok) return { ok: true };
     const body = await r.text().catch(() => '');
-    // 400/422 means the service took the key and only disliked the request shape — good enough
-    if (r.status === 400 || r.status === 422) return { ok: true };
+    // Only 401 means "this key is not ours". Everything else — a request shape the service
+    // disliked (400/422), a plan that forbids this model (403), a missing route (404), a spent
+    // quota (429) — means the service recognised the key, so the key belongs here. Rejecting on
+    // 403 broke working keys from resellers and restricted plans.
+    if (r.status !== 401) return { ok: true };
     return { ok: false, error: apiError(r.status, body) };
-  } catch (e) { return { ok: false, error: e.name === 'TimeoutError' ? 'Сервис не ответил за 25 секунд' : 'Нет связи с сервером API' }; }
+  } catch (e) {
+    // the probe itself failed to reach the service: do not punish the key for that
+    return { ok: true, unverified: String(e.message || e) };
+  }
 }
 ipcMain.handle('api:check', async (_e, { key, url }) => {
   key = String(key || '').trim(); url = String(url || '').trim().replace(/\/(chat\/completions|models)\/?$/, '').replace(/\/$/, '');
@@ -803,9 +844,14 @@ function startTemps() {
   clearInterval(tempTimer);
   tempTimer = setInterval(async () => {
     const s = readSettings(); if (s.heat === false) { if (hot) { hot = false; send('temps', { hot: false }); } return; }
-    const gl = s.gpuLimit || 75, cl = s.cpuLimit || 75;
+    const gl = s.gpuLimit || 85, cl = s.cpuLimit || 85;
     const t = await readTemps(); const max = Math.max(t.gpu || 0, t.cpu || 0), limit = Math.min(gl, cl);
-    const over = (t.gpu || 0) >= gl || (t.cpu || 0) >= cl, cool = (t.gpu || 0) < gl - 6 && (t.cpu || 0) < cl - 6;
+    // Hysteresis of 20 °C: once the limit is hit, the model is throttled until the card has
+    // actually cooled 20° below it. With the old 6° window it crossed back and forth constantly
+    // and the work spent its time pausing instead of finishing.
+    const DROP = 20;
+    const over = (t.gpu || 0) >= gl || (t.cpu || 0) >= cl;
+    const cool = (t.gpu || 0) < gl - DROP && (t.cpu || 0) < cl - DROP;
     const nowHot = over ? true : cool ? false : hot;
     if (nowHot !== hot) { hot = nowHot; if (server && server.pid) { try { require('os').setPriority(server.pid, hot ? 19 : 0); } catch {} } }
     send('temps', { ...t, max, hot, limit });
