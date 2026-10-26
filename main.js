@@ -28,7 +28,7 @@ function send(ch, d) { if (win && !win.isDestroyed()) win.webContents.send(ch, d
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1280, height: 820, minWidth: 980, minHeight: 680, backgroundColor: '#1c1b19',
+    width: 1280, height: 820, minWidth: 980, minHeight: 680, backgroundColor: '#000000',
     titleBarStyle: 'hidden', titleBarOverlay: { color: '#000000', symbolColor: '#ffffff', height: 36 },
     icon: path.join(__dirname, 'build', 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, autoplayPolicy: 'no-user-gesture-required', webviewTag: true }
@@ -63,7 +63,7 @@ function bootCheck() {
 ipcMain.on('boot:ok', () => { const v = app.getVersion(); writeBoot({ ...readBoot(), version: v, pending: false, fails: 0, okVersion: v }); });
 async function rollback(okV, badV) {
   writeBoot({ ...readBoot(), blocked: badV, pending: false, fails: 0 });
-  const w = new BrowserWindow({ width: 520, height: 260, frame: false, resizable: false, backgroundColor: '#1c1b19', show: true });
+  const w = new BrowserWindow({ width: 520, height: 260, frame: false, resizable: false, backgroundColor: '#000000', show: true });
   const page = t => 'data:text/html;charset=utf-8,' + encodeURIComponent(`<body style="margin:0;background:#000;color:#fff;font:300 18px/1.5 Segoe UI,system-ui,sans-serif;display:flex;flex-direction:column;justify-content:center;height:100vh;padding:0 40px;box-sizing:border-box"><div style="font-size:13px;letter-spacing:.4em;color:#777;margin-bottom:14px">PULSAR</div><div id="t">${t}</div></body>`);
   const say = t => { try { w.webContents.executeJavaScript(`document.getElementById('t').innerHTML=${JSON.stringify(t)}`); } catch {} };
   await w.loadURL(page(`Версия ${badV} не запускается.<br>Возвращаю ${okV}…`));
@@ -325,6 +325,130 @@ ipcMain.handle('monitor:set', (_e, on) => {
   return true;
 });
 
+// ---------- image generation: stable-diffusion.cpp, models downloaded like the text ones ----------
+// Pinned like the llama.cpp engine. The asset name is NOT hardcoded: we read the release's own
+// asset list and match it, so a renamed zip shows a clear error instead of a silent 404.
+const SD_TAG = 'master-920-2f88688';
+const SD_DIR = () => path.join(DATA(), 'sd');
+const IMG_DIR = () => path.join(DATA(), 'images');
+const sdExe = () => {
+  for (const d of [path.join(process.resourcesPath || '', 'engine', 'sd'), path.join(__dirname, 'engine', 'sd'), SD_DIR()]) {
+    try { if (fs.existsSync(d)) { const f = findFile(d, 'sd.exe'); if (f) return f; } } catch {}
+  }
+  return null;
+};
+async function sdAsset(tag) {
+  const r = await fetch(`https://api.github.com/repos/leejet/stable-diffusion.cpp/releases/tags/${tag}`, { headers: { 'User-Agent': 'PULSAR' } });
+  if (!r.ok) throw new Error('release ' + tag + ' not found (' + r.status + ')');
+  const assets = (await r.json()).assets || [];
+  const win = assets.filter(a => /win/i.test(a.name) && /\.zip$/i.test(a.name));
+  // prefer a Vulkan build (works on NVIDIA, AMD and Intel), else any CPU/avx build
+  const pick = win.find(a => /vulkan/i.test(a.name)) || win.find(a => /avx2/i.test(a.name)) || win.find(a => /cpu|avx/i.test(a.name)) || win[0];
+  if (!pick) throw new Error('no Windows build in release ' + tag + ' (assets: ' + assets.map(a => a.name).join(', ').slice(0, 300) + ')');
+  return pick;
+}
+async function ensureSd() {
+  const have = sdExe(); if (have) return have;
+  fs.mkdirSync(SD_DIR(), { recursive: true });
+  send('img:status', { stage: 'engine' });
+  const a = await sdAsset(SD_TAG);
+  const zip = path.join(SD_DIR(), a.name);
+  await download(a.browser_download_url, zip, (g, t) => send('img:status', { stage: 'engine', got: g, total: t }));
+  send('img:status', { stage: 'unpack' });
+  await unzip(zip, SD_DIR());
+  try { fs.unlinkSync(zip); } catch {}
+  const exe = sdExe();
+  if (!exe) throw new Error('sd.exe not found after unpacking');
+  return exe;
+}
+ipcMain.handle('img:engine', async () => { try { return { ok: true, path: await ensureSd() }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
+ipcMain.handle('img:have', () => {
+  const d = path.join(DIRS().models, 'img');
+  try { return fs.readdirSync(d).filter(f => f.endsWith('.gguf')).map(f => f.replace(/\.gguf$/, '')); } catch { return []; }
+});
+// an image model is a main .gguf plus, in some repos, a VAE and text encoders next to it
+ipcMain.handle('img:download', async (_e, { id, repos, quant }) => {
+  const key = 'img:' + id;
+  if (jobs[key]) return { ok: false, error: 'already' };
+  const ctl = new AbortController(); jobs[key] = ctl;
+  const dir = path.join(DIRS().models, 'img');
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    const re = new RegExp(String(quant || 'q4').replace(/[_]/g, '[_-]'), 'i');
+    let main = null, extras = [], repo = null;
+    for (const r of repos || []) {
+      try {
+        const info = await (await fetch(`https://huggingface.co/api/models/${r}`, { signal: ctl.signal })).json();
+        const files = (info.siblings || []).map(x => x.rfilename);
+        const ggufs = files.filter(f => /\.gguf$/i.test(f) && !/vae|clip|t5|text_encoder|encoder/i.test(f));
+        const m = ggufs.find(f => re.test(f)) || ggufs.find(f => /q4|q5/i.test(f)) || ggufs[0];
+        if (!m) continue;
+        main = m; repo = r;
+        // companions, when the repo ships them separately
+        for (const pat of [/vae/i, /clip[_-]?l/i, /t5|text_encoder/i]) {
+          const f = files.find(x => pat.test(x) && /\.(gguf|safetensors)$/i.test(x));
+          if (f && f !== m) extras.push(f);
+        }
+        break;
+      } catch (e) { if (ctl.signal.aborted) throw e; }
+    }
+    if (!main) throw new Error('в репозитории нет подходящего файла модели');
+    await download(`https://huggingface.co/${repo}/resolve/main/${encodeURI(main)}`, path.join(dir, id + '.gguf'),
+      (g, t) => send('model:progress', { id: key, got: g, total: t }), ctl.signal);
+    for (const f of extras) {
+      const kind = /vae/i.test(f) ? 'vae' : /clip/i.test(f) ? 'clip' : 't5';
+      const ext = path.extname(f) || '.gguf';
+      await download(`https://huggingface.co/${repo}/resolve/main/${encodeURI(f)}`, path.join(dir, `${id}.${kind}${ext}`),
+        (g, t) => send('model:progress', { id: key, got: g, total: t }), ctl.signal).catch(() => {});
+    }
+    return { ok: true };
+  } catch (e) { return { ok: false, error: String(e.message || e) }; }
+  finally { delete jobs[key]; }
+});
+ipcMain.handle('img:delete', (_e, id) => {
+  const dir = path.join(DIRS().models, 'img');
+  try { for (const f of fs.readdirSync(dir)) if (f === id + '.gguf' || f.startsWith(id + '.')) fs.unlinkSync(path.join(dir, f)); } catch {}
+  return true;
+});
+let imgProc = null;
+ipcMain.handle('img:cancel', () => { if (imgProc) { try { imgProc.kill(); } catch {} imgProc = null; } if (jobs['img:gen']) jobs['img:gen'].abort(); return true; });
+ipcMain.handle('img:make', async (_e, { id, prompt, negative, steps, cfg, w, h, seed, rel }) => {
+  try {
+    const exe = await ensureSd();
+    const dir = path.join(DIRS().models, 'img');
+    const model = path.join(dir, id + '.gguf');
+    if (!fs.existsSync(model)) throw new Error('модель не скачана');
+    fs.mkdirSync(IMG_DIR(), { recursive: true });
+    const out = rel ? wsPath(rel) : path.join(IMG_DIR(), `pulsar-${Date.now()}.png`);
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    const args = ['-m', model, '-p', String(prompt || '').slice(0, 1500), '-o', out,
+      '--steps', String(steps || 4), '--cfg-scale', String(cfg != null ? cfg : 1),
+      '-W', String(w || 512), '-H', String(h || 512), '-s', String(seed != null ? seed : -1)];
+    if (negative) args.push('-n', String(negative).slice(0, 500));
+    for (const [flag, kind] of [['--vae', 'vae'], ['--clip_l', 'clip'], ['--t5xxl', 't5']]) {
+      const f = ['.gguf', '.safetensors'].map(e => path.join(dir, id + '.' + kind + e)).find(x => fs.existsSync(x));
+      if (f) args.push(flag, f);
+    }
+    send('img:status', { stage: 'render' });
+    const log = await new Promise((res, rej) => {
+      let o = '';
+      const p = spawn(exe, args, { cwd: path.dirname(exe), windowsHide: true });
+      imgProc = p;
+      const add = d => {
+        o = (o + d).slice(-8000);
+        const m = String(d).match(/(\d+)\/(\d+)/);
+        if (m) send('img:status', { stage: 'render', step: +m[1], total: +m[2] });
+      };
+      p.stdout.on('data', add); p.stderr.on('data', add);
+      p.on('error', e => rej(new Error(e.message)));
+      p.on('close', code => { imgProc = null; code === 0 && fs.existsSync(out) ? res(o) : rej(new Error(o.split('\n').filter(l => /error|fail|unable|out of memory/i.test(l)).slice(-2).join('\n') || 'sd.exe exited with code ' + code)); });
+    });
+    return { ok: true, file: out, url: pathToFileURL(out).href, log: log.slice(-600) };
+  } catch (e) { return { ok: false, error: String(e.message || e) }; }
+});
+ipcMain.handle('img:open', (_e, f) => shell.openPath(f));
+ipcMain.handle('img:folder', () => shell.openPath(IMG_DIR()));
+
 // ---------- workspace: files the agents can touch ----------
 function workspace() {
   const s = readSettings();
@@ -539,19 +663,42 @@ async function listModels(p, key) {
     return { id, name: m.display_name || m.name && m.name !== m.id ? (m.display_name || m.name) : id, free, ctx: m.context_length || m.context_window || null };
   }).filter(Boolean).filter(m => !/embed|whisper|tts|dall-e|image|audio|moderation|rerank|transcribe|realtime|guard/i.test(m.id));
 }
+// a tiny real request: the only proof that this key belongs to this service
+async function keyWorks(p, key, models) {
+  const model = (models.find(m => /chat|instruct|turbo|gpt|llama|qwen|mistral|gemma/i.test(m.id)) || models[0]).id;
+  try {
+    const r = await fetch(p.url.replace(/\/$/, '') + (p.kind === 'anthropic' ? '/messages' : '/chat/completions'), {
+      method: 'POST', headers: apiHeaders(p, key), signal: AbortSignal.timeout(25000),
+      body: JSON.stringify({ model, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] })
+    });
+    if (r.ok) return { ok: true };
+    const body = await r.text().catch(() => '');
+    // 400/422 means the service took the key and only disliked the request shape — good enough
+    if (r.status === 400 || r.status === 422) return { ok: true };
+    return { ok: false, error: apiError(r.status, body) };
+  } catch (e) { return { ok: false, error: e.name === 'TimeoutError' ? 'Сервис не ответил за 25 секунд' : 'Нет связи с сервером API' }; }
+}
 ipcMain.handle('api:check', async (_e, { key, url }) => {
   key = String(key || '').trim(); url = String(url || '').trim().replace(/\/(chat\/completions|models)\/?$/, '').replace(/\/$/, '');
   if (!key && !url) return { ok: false, error: 'Вставь ключ API' };
   if (/\s/.test(key)) return { ok: false, error: 'В ключе есть пробелы или переносы строк — скопируй его заново' };
   let cands;
   if (url) { const known = PROVIDERS.find(p => url.startsWith(p.url)); cands = [{ name: known ? known.name : (url.match(/\/\/([^/]+)/) || [])[1] || 'API', url, kind: /anthropic\.com/.test(url) ? 'anthropic' : undefined }]; }
-  else { const p = PROVIDERS.find(p => p.re.test(key)); cands = p ? [p] : GUESS; }
+  let guessing = false;
+  if (!url) { const p = PROVIDERS.find(p => p.re.test(key)); guessing = !p; cands = p ? [p] : GUESS; }
   let last = 'Не удалось определить, от какого сервиса этот ключ. Укажи адрес API вручную.', authErr = null;
   for (const p of cands) {
     try {
       const models = await listModels(p, key);
       if (!models.length) { last = 'Ключ работает, но у него нет доступных моделей'; continue; }
       models.sort((a, b) => (b.free - a.free) || a.id.localeCompare(b.id));
+      // Some services (SambaNova among them) serve /models to anyone, key or no key — so a
+      // listing alone used to "identify" any unknown key as theirs. When we are guessing the
+      // service, make the key actually answer a request before we believe it belongs here.
+      if (guessing) {
+        const probe = await keyWorks(p, key, models);
+        if (!probe.ok) { last = probe.error || last; continue; }
+      }
       return { ok: true, provider: p.name, url: p.url, kind: p.kind || 'openai', models };
     } catch (e) {
       if (e.name === 'TimeoutError' || /fetch failed|ENOTFOUND|ECONN/i.test(String(e.message) + String(e.cause))) { last = cands.length === 1 ? 'Нет связи с сервером API — проверь интернет или адрес' : last; continue; }

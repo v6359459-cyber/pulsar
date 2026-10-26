@@ -21,6 +21,13 @@ contextBridge.exposeInMainWorld('pulsar', {
     versions: r => ipcRenderer.invoke('ws:versions', r), restore: (rel, file) => ipcRenderer.invoke('ws:restore', { rel, file })
   },
   pc: { list: d => ipcRenderer.invoke('pc:list', d), read: f => ipcRenderer.invoke('pc:read', f) },
+  img: {
+    engine: () => ipcRenderer.invoke('img:engine'), have: () => ipcRenderer.invoke('img:have'),
+    download: m => ipcRenderer.invoke('img:download', m), del: id => ipcRenderer.invoke('img:delete', id),
+    make: o => ipcRenderer.invoke('img:make', o), cancel: () => ipcRenderer.invoke('img:cancel'),
+    open: f => ipcRenderer.invoke('img:open', f), folder: () => ipcRenderer.invoke('img:folder')
+  },
+  onImg: on('img:status'),
   chat: (id, url, key, body, kind) => ipcRenderer.send('chat:start', { id, url, key, body, kind }),
   bootOk: () => ipcRenderer.send('boot:ok'),
   mmproj: (id, repos) => ipcRenderer.invoke('model:mmproj', { id, repos }), hasMmproj: id => ipcRenderer.invoke('model:hasMmproj', id),

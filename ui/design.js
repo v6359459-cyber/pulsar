@@ -19,7 +19,45 @@ body::before{background:#c4b5fd;top:-10vw;left:-8vw}body::after{background:#fbcf
 .pl-btn{background:linear-gradient(135deg,var(--accent),var(--accent2))}` },
     corp: { ru: 'Строгий корпоративный', en: 'Clean corporate', dru: 'Светлый, синий акцент, чёткая сетка — для бизнеса и услуг', den: 'Light, blue accent, clear grid — for business and services',
       vars: '--bg:#fff;--bg2:#f8fafc;--fg:#0f172a;--muted:#64748b;--card:#fff;--line:#e2e8f0;--accent:#2563eb;--accent-fg:#fff;--accent2:#0ea5e9;--radius:12px;--h-weight:650;--h-track:-.025em;--shadow:0 10px 30px -12px rgba(15,23,42,.18)',
-      extra: `.pl-card,.pl-price-card,.pl-product,.pl-kpi,.pl-quote{box-shadow:0 1px 2px rgba(15,23,42,.06)}.pl-eyebrow{color:var(--accent)}` }
+      extra: `.pl-card,.pl-price-card,.pl-product,.pl-kpi,.pl-quote{box-shadow:0 1px 2px rgba(15,23,42,.06)}.pl-eyebrow{color:var(--accent)}` },
+    brutal: { ru: 'Брутализм', en: 'Brutalism', dru: 'Жирные рамки, резкие тени, кричащие цвета, огромный шрифт', den: 'Thick borders, hard shadows, loud colours, huge type',
+      vars: '--bg:#fffceb;--bg2:#fff;--fg:#0a0a0a;--muted:#3f3f3f;--card:#fff;--line:#0a0a0a;--accent:#ff4a1c;--accent-fg:#fff;--accent2:#1d4ed8;--radius:0px;--h-weight:800;--h-track:-.04em;--shadow:8px 8px 0 #0a0a0a',
+      extra: `.pl-card,.pl-price-card,.pl-product,.pl-kpi,.pl-quote,.pl-form,.pl-menu,.pl-faq details,.pl-cta{border:3px solid #0a0a0a;box-shadow:var(--shadow)}
+.pl-btn{border:3px solid #0a0a0a;box-shadow:5px 5px 0 #0a0a0a;border-radius:0;transition:transform .12s,box-shadow .12s}
+.pl-btn:hover{transform:translate(3px,3px);box-shadow:2px 2px 0 #0a0a0a}
+.pl-card:hover,.pl-product:hover,.pl-price-card:hover{transform:translate(-3px,-3px);box-shadow:11px 11px 0 #0a0a0a}
+.pl-hero h1,.pl-hero-split h1{line-height:.92;text-transform:uppercase}
+.pl-eyebrow{background:var(--accent);color:#fff;padding:3px 10px;border:3px solid #0a0a0a;display:inline-block}
+.pl-nav{border-bottom:3px solid #0a0a0a;box-shadow:none}` },
+    term: { ru: 'Терминал', en: 'Terminal', dru: 'Моношрифт, зелёный по чёрному, каретка, консольная сетка', den: 'Monospace, green on black, caret, console grid',
+      vars: '--bg:#06080a;--bg2:#0b1014;--fg:#c8f7d4;--muted:#5f8f72;--card:#0b1014;--line:#1d3326;--accent:#2bff88;--accent-fg:#06080a;--accent2:#7df9ff;--radius:4px;--h-weight:500;--h-track:0em;--shadow:0 0 0 1px rgba(43,255,136,.18)',
+      extra: `body{font-family:"Geist Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+h1,h2,h3,.pl-btn,.pl-eyebrow{font-family:inherit;text-transform:lowercase}
+.pl-eyebrow::before{content:'$ '}
+.pl-hero h1::after,.pl-hero-split h1::after{content:'_';animation:pl-caret 1.1s steps(1) infinite;color:var(--accent)}
+@keyframes pl-caret{50%{opacity:0}}
+.pl-card,.pl-price-card,.pl-product,.pl-kpi,.pl-quote,.pl-faq details{border:1px solid var(--line)}
+.pl-card:hover,.pl-product:hover,.pl-price-card:hover{border-color:var(--accent);box-shadow:0 0 24px -8px var(--accent)}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(to bottom,rgba(43,255,136,.045) 0 1px,transparent 1px 3px);pointer-events:none;z-index:9999}` },
+    mag: { ru: 'Журнал', en: 'Magazine', dru: 'Крупные заголовки, колонки, строгая сетка, много воздуха', den: 'Big headlines, columns, strict grid, lots of air',
+      vars: '--bg:#fbfaf7;--bg2:#f1efe9;--fg:#141210;--muted:#6a645c;--card:#fbfaf7;--line:#141210;--accent:#141210;--accent-fg:#fbfaf7;--accent2:#b4452f;--radius:0px;--h-weight:300;--h-track:-.05em;--shadow:none',
+      extra: `.pl-hero h1,.pl-hero-split h1{font-size:clamp(44px,8vw,116px);line-height:.94}
+.pl-nav{border-bottom:1px solid var(--line);box-shadow:none}
+.pl-section + .pl-section{border-top:1px solid var(--line)}
+.pl-card,.pl-price-card,.pl-product,.pl-kpi{border:none;border-top:1px solid var(--line);border-radius:0;padding-top:22px}
+.pl-quote{border:none;border-left:3px solid var(--accent2);font-size:1.3em;line-height:1.35;padding-left:24px}
+.pl-eyebrow{letter-spacing:.22em;text-transform:uppercase;font-size:11px;color:var(--accent2)}
+.pl-lead,.pl-text{column-gap:40px}
+@media(min-width:900px){.pl-text{columns:2}}` },
+    grad: { ru: 'Градиенты', en: 'Gradients', dru: 'Плавные цветные переходы, размытые пятна, стеклянные карточки', den: 'Smooth colour transitions, blurred blobs, glass cards',
+      vars: '--bg:#0d0920;--bg2:rgba(255,255,255,.06);--fg:#f4f1ff;--muted:#a79ed0;--card:rgba(255,255,255,.07);--line:rgba(255,255,255,.14);--accent:#ff7ac6;--accent-fg:#1a0b2e;--accent2:#5ee7ff;--radius:22px;--h-weight:500;--h-track:-.035em;--shadow:0 24px 70px -24px rgba(255,122,198,.5)',
+      extra: `body{background:linear-gradient(160deg,#0d0920,#1b0f3a 45%,#0a1030)}
+body::before,body::after{content:'';position:fixed;width:58vw;height:58vw;border-radius:50%;filter:blur(90px);opacity:.5;z-index:-1;pointer-events:none;animation:pl-float 18s ease-in-out infinite alternate}
+body::before{background:linear-gradient(135deg,#ff7ac6,#8b5cf6);top:-16vw;left:-12vw}
+body::after{background:linear-gradient(135deg,#5ee7ff,#3b82f6);bottom:-18vw;right:-12vw;animation-delay:-8s}
+.pl-card,.pl-price-card,.pl-quote,.pl-product,.pl-kpi,.pl-cta,.pl-nav,.pl-faq details,.pl-form,.pl-menu{backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5)}
+.pl-hero h1 .pl-w,.pl-hero-split h1 .pl-w{background:linear-gradient(100deg,#fff,var(--accent) 45%,var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;padding-bottom:.08em}
+.pl-btn{background:linear-gradient(100deg,var(--accent),var(--accent2));border:none;color:#1a0b2e}` }
   };
 
   const CSS = `*,*::before,*::after{box-sizing:border-box}html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}

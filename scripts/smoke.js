@@ -16,7 +16,7 @@ const ctx = {
   console, document: doc, window:{ addEventListener(){} }, navigator:{ mediaDevices:{}, clipboard:{} },
   localStorage:{ getItem:()=>null, setItem(){} }, setTimeout, clearTimeout, setInterval, fetch:()=>Promise.resolve({}),
   AudioContext: function(){}, speechSynthesis:{ cancel(){}, getVoices:()=>[] },
-  pulsar: new Proxy({}, { get: (t,k) => k === 'ws' || k === 'pc' || k === 'chats'
+  pulsar: new Proxy({}, { get: (t,k) => ['ws','pc','chats','img'].includes(k)
       ? new Proxy({}, { get: () => () => Promise.resolve([]) })
       : /^on[A-Z]/.test(String(k)) ? () => (() => {}) : () => Promise.resolve({}) }),
   requestAnimationFrame: cb => cb(), innerWidth: 1280, innerHeight: 800, DOMException: class extends Error {},
@@ -81,6 +81,36 @@ ok('export writes the title and both sides', /# Кофейня/.test(ctx._md) &&
 // 5. absolute paths are read-only territory
 run("globalThis._p = [isAbs('C:\\\\Users\\\\x\\\\a.txt'), isAbs('cafe/index.html'), isAbs('\\\\\\\\nas\\\\share')]");
 ok('isAbs spots full paths only', ctx._p[0] === true && ctx._p[1] === false && ctx._p[2] === true, ctx._p);
+
+// 6. image models
+run("S.st.hw = { vramGB: 8, ramGB: 16 }; globalThis._i = IMG_CATALOG.map(m => [m.id, imgFit(m)]);");
+const fits = ctx._i;
+ok('image catalog is not empty', fits.length >= 6, fits.length);
+ok('an 8 GB GPU runs the light ones', fits.filter(([, f]) => f === 2).length >= 2, fits);
+run("S.st.hw = { vramGB: 0, ramGB: 8 }; globalThis._i2 = IMG_CATALOG.filter(m => imgFit(m) >= 0).map(m => m.id);");
+ok('a PC with no GPU still has something to run', ctx._i2.length >= 1, ctx._i2);
+run("globalThis._bad = IMG_CATALOG.filter(m => !m.id || !m.repos.length || !m.steps || !m.w).map(m => m.id);");
+ok('every image model is fully described', ctx._bad.length === 0, ctx._bad);
+run("globalThis._dups = IMG_CATALOG.length - new Set(IMG_CATALOG.map(m => m.id)).size;");
+ok('no duplicate image model ids', ctx._dups === 0, ctx._dups);
+
+// 7. build requests in either word order
+const pick2 = t => { run(`globalThis._b = pickAgent(${JSON.stringify(t)}).id`); return ctx._b; };
+run("S.lastAgentId = null; S.lastProject = null; B.tabs = [];");
+ok('"напиши калькулятор" -> coder', pick2('напиши калькулятор') === 'coder', pick2('напиши калькулятор'));
+ok('"калькулятор напиши" -> coder', pick2('калькулятор напиши') === 'coder', pick2('калькулятор напиши'));
+ok('"таймер сделай" -> coder', pick2('таймер сделай') === 'coder', pick2('таймер сделай'));
+ok('"write a todo app" -> coder', pick2('write a todo app') === 'coder', pick2('write a todo app'));
+
+// 8. reasoning a model prints without <think> tags is cut off
+run(`globalThis._t1 = noThink("The user is asking me to write a calculator. According to my instructions, I should mention PULSAR CODE.\\nОтлично! Вот готовый калькулятор, держи код ниже и запускай.")`);
+ok('leaked reasoning is stripped', !/The user is asking/.test(ctx._t1) && /Отлично/.test(ctx._t1), ctx._t1);
+run(`globalThis._t2 = noThink("The user interface is the part you see on screen.")`);
+ok('a real English answer is not eaten', /interface/.test(ctx._t2), ctx._t2);
+
+// 9. design styles
+run("globalThis._th = Object.keys(DESIGN.THEMES);");
+ok('eight design styles', ctx._th.length === 8, ctx._th);
 
 console.log(bad ? `\n${bad} CHECK(S) FAILED` : '\nall behaviour checks passed');
 process.exitCode = bad ? 1 : 0;

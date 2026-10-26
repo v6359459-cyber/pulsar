@@ -35,8 +35,8 @@ No account, no subscription — download a model and start building. Connect clo
 - **Chat history, resumable model downloads, auto-updates** (PULSAR checks for updates right after the intro and installs them by itself).
 - **English and Russian** interface.
 
-- **Design mode.** Websites are built from 25 ready shadcn/ui-style blocks (hero, pricing, menu, reviews, FAQ, dashboard…) in one of four styles — Apple minimalism, dark tech / neon, glass and soft colors, clean corporate. PULSAR adds the CSS and the animations, so even a small model makes a clean site. Can be turned off.
-- **Any cloud API.** Paste a key from OpenRouter, Groq, Gemini, Claude, OpenAI, DeepSeek, xAI and others — PULSAR detects the provider and connects every model it offers at once; you pick which one answers in the chat. Or pick the PC model, or **Together**: both answer, review each other and the best final answer comes out.
+- **Design mode.** Websites are built from 25 ready shadcn/ui-style blocks (hero, pricing, menu, reviews, FAQ, dashboard…) in one of eight styles — Apple minimalism, dark tech / neon, glass and soft colors, clean corporate, brutalism, terminal, magazine and gradients. PULSAR adds the CSS and the animations, so even a small model makes a clean site. Can be turned off.
+- **Any cloud API.** Paste a key from OpenRouter, Groq, Gemini, Claude, OpenAI, DeepSeek, xAI and others — PULSAR checks the key with a real request and connects every model it gives access to; you pick which one answers in the chat. Or pick the PC model, or **Together**: both answer, review each other and the best final answer comes out.
 - **Vision.** Models marked "sees pictures" (Gemma 4, Qwen3.5 9B, and vision API models) understand photos and screenshots — "make a site like this screenshot".
 - **Real photos on sites.** On request PULSAR picks photos from Openverse (or Pexels with your free key) and saves them next to the site.
 - **Safe updates.** API keys are encrypted with Windows. If a new version fails to start twice, PULSAR rolls back to the last one that worked.
@@ -56,9 +56,13 @@ With **Auto** on, PULSAR picks the agent for every message and chains them when 
 
 `Task received → Analysis → Plan → Processing → Check & fix → Saving`
 
+## Image generation
+
+A separate **Image generation** section that works like the text models: pick a model, download it, run it. Eight models in three groups, from **SD Turbo** (1 GB, draws in seconds even with no GPU) to **Qwen Image 2.1** (8.5 GB, the best at rendering text inside the picture). Every card shows whether your PC can run it. The [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp) engine downloads itself before the first image, and finished pictures stay in a gallery and in their own folder.
+
 ## Models
 
-18 models in four groups — **Fast**, **Code**, **Problems & logic**, **Powerful** — including Qwen3.5 9B, Gemma 4 (E4B, 12B, 26B A4B), gpt-oss 20B, DeepSeek R1 8B, Granite 4.2 8B, LFM2.5 8B-A1B, Llama 3.2 3B and the Qwen 2.5 family. Every card shows whether it fits your PC and the settings PULSAR will use.
+28 models in five groups — **For weak PCs**, **Fast**, **Code**, **Problems & logic**, **Powerful** — including Qwen3.5 9B, Gemma 4 (E4B, 12B, 26B A4B), gpt-oss 20B, DeepSeek R1 8B, Granite 4.2 8B, LFM2.5 8B-A1B, Llama 3.2 3B and the Qwen 2.5 family. Every card shows whether it fits your PC and the settings PULSAR will use.
 
 ## Requirements
 
@@ -99,7 +103,7 @@ npm run build    # make the installer in ./dist
 
 Releases are built by GitHub Actions (`.github/workflows/release.yml`) and published to GitHub Releases; the app updates itself from there. The workflow syntax-checks every script and runs the smoke test before it builds, so a broken release does not get published.
 
-The llama.cpp engine version is pinned in two places that must stay in step: `LLAMA_TAG` in `main.js` and `TAG` in `scripts/fetch-engine.js`.
+The llama.cpp engine version is pinned in two places that must stay in step: `LLAMA_TAG` in `main.js` and `TAG` in `scripts/fetch-engine.js`. The stable-diffusion.cpp release is pinned separately as `SD_TAG` in `main.js`; its Windows zip is found by matching the release's own asset list, so a renamed asset gives a clear error instead of a silent 404.
 
 ## Report a problem
 
@@ -123,7 +127,8 @@ In PULSAR open **Optimization → Report a problem**. It saves a report file (ve
 - Агенты пишут сайты и программы, сохраняют файлы, запускают код и открывают сайты во встроенном браузере.
 - Несколько агентов в одном запросе: один разбирает пример по ссылке, двое пишут код, PULSAR проверяет результат, ещё один агент исправляет ошибки.
 - Перед сохранением на компьютер всегда спрашивает разрешение, а прошлую версию перезаписанного файла всегда можно вернуть.
-- **Режим дизайна:** сайты собираются из 25 готовых блоков в стиле shadcn/ui, 4 стиля (минимализм Apple, тёмный tech / неон, стекло, корпоративный), стили и анимации PULSAR добавляет сам. Можно выключить.
+- **Режим дизайна:** сайты собираются из 25 готовых блоков в стиле shadcn/ui, 8 стилей (минимализм Apple, тёмный tech / неон, стекло, корпоративный, брутализм, терминал, журнал, градиенты), стили и анимации PULSAR добавляет сам. Можно выключить.
+- **Генерация фото:** отдельный раздел — качаешь модель и рисуешь прямо на ПК, от лёгкой SD Turbo до Qwen Image 2.1, которая умеет надписи по-русски.
 - **Любые облачные API:** вставь ключ и дай имя — PULSAR сам определит сервис и подключит все его модели; какая отвечает, выбираешь в чате. Или модель на ПК, или «Вместе» — обе отвечают, спорят и выдают лучший итог.
 - **Модели видят картинки** (Gemma 4, Qwen3.5 9B и API-модели со зрением): «сделай сайт как на скрине».
 - **Настоящие фото на сайтах** с Openverse или Pexels — сохраняются в папку сайта.

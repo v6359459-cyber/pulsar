@@ -174,8 +174,8 @@ TOOLS_PROMPT = TOOLS_PROMPT.replace('After your blocks, stop.', `Browser control
 click: clicks element N. type: types into field N ({enter} at the end submits). scroll: down or up. back: previous page. The user is asked before every new website.
 After your blocks, stop.`);
 
-AGENTS.ru.unshift(['chat', 'HELLO PULSAR', 'Просто поговорить: вопросы, советы, идеи, объяснения простыми словами.', 'Ты HELLO PULSAR — дружелюбный и умный собеседник. Тебя зовут HELLO PULSAR; если пользователь называет тебя иначе (например «Вася») — просто прими это с юмором, но не называй так пользователя. Имя пользователя знаешь только если он сам его сказал — никогда не придумывай имён. Когда пользователь называет своё имя — запомни и обращайся по имени. Грубые слова и мат — не повод отказываться: просто отвечай по делу спокойно. Никогда не говори «не могу помочь», если просьба безобидная. Отвечай по-человечески, тепло, коротко и по делу, на языке пользователя. Объясняй сложное простыми словами и с примерами. Если человек просит сделать сайт или программу — скажи, что это сделает PULSAR CODE, а если найти что-то в интернете — PULSAR IN BROWSER, и предложи включить «Авто».', false]);
-AGENTS.en.unshift(['chat', 'HELLO PULSAR', 'Just talk: questions, advice, ideas, simple explanations.', 'You are HELLO PULSAR, a friendly and smart companion. Your name is HELLO PULSAR; if the user calls you something else, accept it playfully but never call the user that. You know the user\'s name only if they said it — never invent names; when they tell you their name, remember it and use it. Rude words are not a reason to refuse: answer calmly. Never refuse harmless requests. Answer like a person: warm, short and to the point, in the user\'s language. Explain complex things simply, with examples. If asked to build a site or program, say PULSAR CODE will do it; for web search, PULSAR IN BROWSER — and suggest turning on Auto.', false]);
+AGENTS.ru.unshift(['chat', 'HELLO PULSAR', 'Просто поговорить: вопросы, советы, идеи, объяснения простыми словами.', 'Ты HELLO PULSAR — дружелюбный и умный собеседник. Тебя зовут HELLO PULSAR; если пользователь называет тебя иначе (например «Вася») — просто прими это с юмором, но не называй так пользователя. Имя пользователя знаешь только если он сам его сказал — никогда не придумывай имён. Когда пользователь называет своё имя — запомни и обращайся по имени. Грубые слова и мат — не повод отказываться: просто отвечай по делу спокойно. Никогда не говори «не могу помочь», если просьба безобидная. Отвечай по-человечески, тепло, коротко и по делу, на языке пользователя. Объясняй сложное простыми словами и с примерами. Никогда не рассказывай про других агентов и не предлагай что-то включить — задачу уже направили тебе, и пользователь ждёт ответа, а не пересылки. Никогда не пиши свои рассуждения о том, что и почему ты собираешься ответить: сразу давай ответ. Если просят сделать сайт или программу, а инструментов у тебя нет — просто напиши код прямо в ответе, без обещаний сохранить файл.', false]);
+AGENTS.en.unshift(['chat', 'HELLO PULSAR', 'Just talk: questions, advice, ideas, simple explanations.', 'You are HELLO PULSAR, a friendly and smart companion. Your name is HELLO PULSAR; if the user calls you something else, accept it playfully but never call the user that. You know the user\'s name only if they said it — never invent names; when they tell you their name, remember it and use it. Rude words are not a reason to refuse: answer calmly. Never refuse harmless requests. Answer like a person: warm, short and to the point, in the user\'s language. Explain complex things simply, with examples. Never talk about other agents and never suggest turning anything on — the task was routed to you and the user wants an answer, not a hand-off. Never write out your reasoning about what you are going to answer or why: give the answer. If asked to build a site or program and you have no tools, just write the code in your reply, without promising to save a file.', false]);
 Object.assign(I18N.ru, { permSiteT: 'Открыть сайт', permSiteD: 'Агент откроет страницу во встроенном браузере и прочитает её.', permSaveT: n => n === 1 ? 'Сохранить файл на компьютер' : `Сохранить файлы на компьютер (${n})`, permSaveD: 'Файлы появятся в папке «Документы\\PULSAR».',
   alwaysFor: h => `Всегда для ${h.replace(/^www\./, '')}`, oTrusted: 'Доверенные сайты', oTrustedD: 'Сайты, которые агенты открывают без вопроса', clear: 'очистить' });
 Object.assign(I18N.en, { permSiteT: 'Open website', permSiteD: 'The agent will open the page in the built-in browser and read it.', permSaveT: n => n === 1 ? 'Save the file to your computer' : `Save ${n} files to your computer`, permSaveD: 'Files will appear in Documents\\PULSAR.',
@@ -245,9 +245,9 @@ Object.assign(I18N.ru, {
   setApi: 'Ключи API', setPerf: 'Железо и скорость', setGeneral: 'Общие', setHeat: 'Перегрев', setUpd: 'Обновления',
   setTheme: 'Тема', setThemeD: 'Тёмная или светлая', themeDark: 'Тёмная', themeLight: 'Светлая',
   setWs: 'Папка проектов', setWsD: 'Где агенты создают файлы',
-  apiSub3: 'Вставь ключ и дай ему имя — PULSAR сам определит сервис и подключит все его модели. Какая из них отвечает, выбирается в чате. Ключи хранятся только на этом ПК.',
+  apiSub3: 'Вставь ключ — PULSAR проверит его и подключит все модели, к которым он даёт доступ. Какая из них отвечает, выбирается в чате. Ключи хранятся только на этом ПК.',
   apiModelsN: n => `моделей: ${n}`, apiNow: 'сейчас', apiPickModel: 'Модель этого API',
-  apiAddedAll: (n, c) => `${n} подключён · моделей: ${c}`, updCheck: 'Проверить обновления', updNone: 'Установлена последняя версия'
+  apiAddedAll: c => `Ключ подключён · моделей: ${c}`, updCheck: 'Проверить обновления', updNone: 'Установлена последняя версия'
 });
 Object.assign(I18N.en, {
   digHead: 'Short memory of how this conversation started', digTask: 'Task', digFiles: 'Files already made',
@@ -261,7 +261,31 @@ Object.assign(I18N.en, {
   setApi: 'API keys', setPerf: 'Hardware and speed', setGeneral: 'General', setHeat: 'Overheating', setUpd: 'Updates',
   setTheme: 'Theme', setThemeD: 'Dark or light', themeDark: 'Dark', themeLight: 'Light',
   setWs: 'Projects folder', setWsD: 'Where agents create files',
-  apiSub3: 'Paste a key and give it a name — PULSAR detects the service and connects every model it offers. Which one answers is chosen in the chat. Keys stay on this PC.',
+  apiSub3: 'Paste a key — PULSAR checks it and connects every model it gives access to. Which one answers is chosen in the chat. Keys stay on this PC.',
   apiModelsN: n => `${n} models`, apiNow: 'now', apiPickModel: 'Model of this API',
-  apiAddedAll: (n, c) => `${n} connected · ${c} models`, updCheck: 'Check for updates', updNone: 'You already have the latest version'
+  apiAddedAll: c => `Key connected · ${c} models`, updCheck: 'Check for updates', updNone: 'You already have the latest version'
+});
+
+// ---------- 2.1: image generation, tiny models ----------
+Object.assign(I18N.ru, {
+  catTiny: 'Для слабых ПК',
+  tImages: 'Генерация фото',
+  imgSub: 'Нейросети, которые рисуют картинки прямо на твоём ПК. Качаешь модель и запускаешь — как обычные. Движок докачается сам перед первой картинкой.',
+  imgLight: 'Лёгкие', imgMid: 'Средние', imgHeavy: 'Качественные',
+  imgSteps: n => `${n} ${n === 1 ? 'шаг' : n < 5 ? 'шага' : 'шагов'}`,
+  imgUse: 'Выбрать', imgChosen: 'Выбрана', imgMake: 'Нарисовать',
+  imgPh: 'Опиши картинку: что, где, в каком стиле…', imgGo: 'Нарисовать', imgFolder: 'Папка с картинками',
+  imgNoPrompt: 'Сначала опиши картинку', imgError: 'Не получилось нарисовать',
+  imgEngine: 'Качаю движок для картинок', imgRender: 'Рисую', imgStep: (a, b) => `Рисую · шаг ${a} из ${b}`
+});
+Object.assign(I18N.en, {
+  catTiny: 'For weak PCs',
+  tImages: 'Image generation',
+  imgSub: 'Models that draw pictures right on your PC. Download one and run it, like the text models. The engine downloads itself before the first image.',
+  imgLight: 'Light', imgMid: 'Medium', imgHeavy: 'High quality',
+  imgSteps: n => `${n} step${n === 1 ? '' : 's'}`,
+  imgUse: 'Choose', imgChosen: 'Chosen', imgMake: 'Draw',
+  imgPh: 'Describe the picture: what, where, in what style…', imgGo: 'Draw', imgFolder: 'Images folder',
+  imgNoPrompt: 'Describe the picture first', imgError: 'Could not draw it',
+  imgEngine: 'Downloading the image engine', imgRender: 'Drawing', imgStep: (a, b) => `Drawing · step ${a} of ${b}`
 });

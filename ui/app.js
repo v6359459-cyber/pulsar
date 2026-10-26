@@ -25,8 +25,58 @@ const CATALOG = [
   { id: 'gemma4-12b', vision: true, cat: 'power', fresh: true, name: 'Gemma 4 12B', repos: ['unsloth/gemma-4-12b-it-GGUF'], size: 7.6, layers: 48, kv: 100, tags: ['code', 'general'], ru: 'Заметно сильнее в коде, чем лёгкие модели. Медленнее.', en: 'Noticeably stronger at code than light models. Slower.' },
   { id: 'gemma4-26b-a4b', vision: true, cat: 'power', fresh: true, name: 'Gemma 4 26B A4B', repos: ['unsloth/gemma-4-26B-A4B-it-GGUF', 'AtomicChat/gemma-4-26B-A4B-it-GGUF'], size: 15.5, layers: 30, kv: 100, moe: true, active: 4, tags: ['code', 'general'], ru: 'Лучшая по коду в списке. Нужно много оперативной памяти.', en: 'Best at code in the list. Needs a lot of RAM.' },
   { id: 'qwen25-14b', cat: 'power', name: 'Qwen 2.5 14B', repos: ['bartowski/Qwen2.5-14B-Instruct-GGUF'], size: 9.0, layers: 48, kv: 98, tags: ['general', 'code'], ru: 'Умнее 7B-моделей. Лучше с видеокартой от 12 ГБ.', en: 'Smarter than 7B models. Best with a 12 GB GPU.' },
-  { id: 'qwen25-32b', cat: 'power', name: 'Qwen 2.5 32B', repos: ['bartowski/Qwen2.5-32B-Instruct-GGUF'], size: 19.9, layers: 64, kv: 131, tags: ['general', 'code'], ru: 'Очень умная и очень тяжёлая.', en: 'Very smart and very heavy.' }
+  { id: 'qwen25-32b', cat: 'power', name: 'Qwen 2.5 32B', repos: ['bartowski/Qwen2.5-32B-Instruct-GGUF'], size: 19.9, layers: 64, kv: 131, tags: ['general', 'code'], ru: 'Очень умная и очень тяжёлая.', en: 'Very smart and very heavy.' },
+
+  // --- 2.1: tiny models for weak PCs ---
+  { id: 'qwen3-1.7b', cat: 'tiny', fresh: true, name: 'Qwen3 1.7B', repos: ['unsloth/Qwen3-1.7B-GGUF', 'bartowski/Qwen_Qwen3-1.7B-GGUF'], size: 1.1, layers: 28, kv: 28, tags: ['general'], ru: 'Работает без видеокарты на 8 ГБ памяти. Для простых вопросов и коротких текстов.', en: 'Runs with no GPU on 8 GB of RAM. For simple questions and short texts.' },
+  { id: 'gemma3-1b', cat: 'tiny', fresh: true, name: 'Gemma 3 1B', repos: ['unsloth/gemma-3-1b-it-GGUF', 'bartowski/google_gemma-3-1b-it-GGUF'], size: 0.8, layers: 26, kv: 20, tags: ['general'], ru: 'Самая лёгкая в списке. Пойдёт на старом ноутбуке.', en: 'The lightest in the list. Runs on an old laptop.' },
+  { id: 'qwen3-4b', cat: 'tiny', fresh: true, name: 'Qwen3 4B', repos: ['unsloth/Qwen3-4B-GGUF', 'bartowski/Qwen_Qwen3-4B-GGUF'], size: 2.5, layers: 36, kv: 36, tags: ['general', 'reason'], ru: 'Заметно умнее совсем маленьких, но всё ещё лёгкая.', en: 'Noticeably smarter than the tiny ones, still light.' },
+
+  // --- 2.1: strong coders ---
+  { id: 'qwen3-coder-30b', cat: 'code', fresh: true, name: 'Qwen3 Coder 30B A3B', repos: ['unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF'], size: 18.6, layers: 48, kv: 24, moe: true, active: 3, tags: ['code'], ru: 'Сильнейшая по коду из тех, что реально запустить дома. Работают только 3 млрд из 30, поэтому не так медленно, как кажется по размеру.', en: 'Strongest code model you can actually run at home. Only 3B of 30B are active, so it is faster than its size suggests.' },
+  { id: 'devstral-24b', cat: 'code', fresh: true, name: 'Devstral Small 2 24B', repos: ['unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF'], size: 14.3, layers: 40, kv: 32, tags: ['code'], ru: 'Сделана под работу с файлами проекта и правку чужого кода. Нужна хорошая видеокарта.', en: 'Built for working across project files and editing existing code. Needs a good GPU.' },
+
+  // --- 2.1: more models that see pictures ---
+  { id: 'qwen3-vl-4b', vision: true, cat: 'fast', fresh: true, name: 'Qwen3 VL 4B', repos: ['unsloth/Qwen3-VL-4B-Instruct-GGUF'], size: 2.6, layers: 36, kv: 36, tags: ['general'], ru: 'Лёгкая и видит картинки. Для скриншотов и фото на слабом ПК.', en: 'Light and sees pictures. For screenshots and photos on a weak PC.' },
+  { id: 'qwen3-vl-8b', vision: true, cat: 'code', fresh: true, name: 'Qwen3 VL 8B', repos: ['unsloth/Qwen3-VL-8B-Instruct-GGUF'], size: 5.0, layers: 36, kv: 16, tags: ['code', 'general'], ru: 'Видит картинки и неплохо пишет код: «сделай сайт как на этом скрине».', en: 'Sees pictures and writes decent code: "make a site like this screenshot".' },
+  { id: 'qwen25-vl-7b', vision: true, cat: 'fast', name: 'Qwen 2.5 VL 7B', repos: ['unsloth/Qwen2.5-VL-7B-Instruct-GGUF', 'bartowski/Qwen2-VL-7B-Instruct-GGUF'], size: 4.7, layers: 28, kv: 29, tags: ['general'], ru: 'Проверенная зрячая модель. Хорошо описывает фото и разбирает скриншоты.', en: 'A proven vision model. Good at describing photos and reading screenshots.' },
+
+  // --- 2.1: heavy MoE ---
+  { id: 'glm45-air', cat: 'power', fresh: true, name: 'GLM 4.5 Air', repos: ['unsloth/GLM-4.5-Air-GGUF'], size: 69, layers: 46, kv: 20, moe: true, active: 12, tags: ['general', 'code', 'reason'], ru: 'Очень умная. Нужно очень много оперативной памяти — 64 ГБ и выше.', en: 'Very smart. Needs a lot of RAM — 64 GB and up.' },
+  { id: 'gpt-oss-120b', cat: 'power', fresh: true, name: 'gpt-oss 120B', repos: ['unsloth/gpt-oss-120b-GGUF', 'ggml-org/gpt-oss-120b-GGUF'], quant: 'MXFP4', size: 63, layers: 36, kv: 24, moe: true, active: 5.1, tags: ['general', 'code', 'reason'], ru: 'Старшая модель OpenAI с открытым весом. Для машин с 64+ ГБ памяти.', en: 'OpenAI\'s larger open-weight model. For machines with 64+ GB of RAM.' }
 ];
+// ---------- image models (stable-diffusion.cpp) ----------
+// Every repo id below is a real repository tagged for stable-diffusion.cpp on Hugging Face;
+// the file inside is found at download time, so a repo that reorganises its files still works.
+const IMG_CATALOG = [
+  { id: 'sd-turbo', cat: 'light', name: 'SD Turbo', repos: ['Green-Sky/SD-Turbo-GGUF'], size: 1.0, steps: 1, cfg: 1, w: 512, h: 512,
+    ru: 'Самая лёгкая. Картинка за секунды даже без видеокарты. Качество простое.', en: 'The lightest. An image in seconds even with no GPU. Simple quality.' },
+  { id: 'lcm-ssd1b', cat: 'light', name: 'LCM SSD-1B', repos: ['OlegSkutte/LCM-SSD-1B-GGUF'], size: 2.0, steps: 4, cfg: 1, w: 768, h: 768,
+    ru: 'Лёгкая, но заметно аккуратнее SD Turbo. Хороший первый выбор.', en: 'Light, but visibly neater than SD Turbo. A good first pick.' },
+  { id: 'sdxl-turbo', cat: 'mid', name: 'SDXL Turbo', repos: ['OlegSkutte/sdxl-turbo-GGUF'], size: 3.2, steps: 4, cfg: 1, w: 768, h: 768,
+    ru: 'Разрешение выше и детали лучше. Нужна видеокарта от 4 ГБ.', en: 'Higher resolution and better detail. Needs a 4 GB GPU.' },
+  { id: 'sdxl-lightning', cat: 'mid', name: 'SDXL Lightning', repos: ['OlegSkutte/SDXL-Lightning-GGUF'], size: 3.4, steps: 4, cfg: 1, w: 1024, h: 1024,
+    ru: 'Тот же SDXL, но обучена рисовать за 4 шага. Для картинок 1024×1024.', en: 'The same SDXL, trained to draw in 4 steps. For 1024×1024 images.' },
+  { id: 'z-image-turbo', cat: 'mid', fresh: true, name: 'Z-Image Turbo', repos: ['leejet/Z-Image-Turbo-GGUF', 'wbruna/Z-Image-Turbo-sdcpp-GGUF'], size: 6.0, steps: 8, cfg: 1, w: 1024, h: 1024,
+    ru: 'Самая популярная у пользователей движка. Хорошо понимает длинные описания.', en: 'The most popular model among engine users. Handles long descriptions well.' },
+  { id: 'flux-schnell', cat: 'heavy', name: 'FLUX.1 schnell', repos: ['leejet/FLUX.1-schnell-gguf', 'Green-Sky/flux.1-schnell-GGUF'], size: 7.0, steps: 4, cfg: 1, w: 1024, h: 1024,
+    ru: 'Высокое качество и хорошо пишет текст на картинке. Нужно 8+ ГБ видеопамяти.', en: 'High quality and good at text inside the image. Needs 8+ GB of VRAM.' },
+  { id: 'flux2-klein-4b', cat: 'heavy', fresh: true, name: 'FLUX.2 klein 4B', repos: ['leejet/FLUX.2-klein-4B-GGUF', 'OlegSkutte/FLUX.2-klein-4B-GGUF'], size: 5.5, steps: 6, cfg: 1, w: 1024, h: 1024,
+    ru: 'Новое поколение FLUX в уменьшенном размере. Качество выше при меньшем весе.', en: 'The new FLUX generation in a smaller size. Better quality for less weight.' },
+  { id: 'qwen-image', cat: 'heavy', fresh: true, name: 'Qwen Image 2.1', repos: ['leejet/Qwen-Image-2.1-GGUF'], size: 8.5, steps: 8, cfg: 2.5, w: 1024, h: 1024,
+    ru: 'Лучше всех рисует надписи, в том числе на русском. Самая тяжёлая в списке.', en: 'Best at rendering text, Russian included. The heaviest in the list.' }
+];
+const IMG_CATS = [['light', 'imgLight'], ['mid', 'imgMid'], ['heavy', 'imgHeavy']];
+// what this PC can realistically run: VRAM first, RAM as the fallback
+function imgFit(m) {
+  const hw = S.st.hw || {};
+  const vram = S.st.engine === 'cpu' ? 0 : hw.vramGB || 0, ram = hw.ramGB || 8;
+  if (vram >= m.size + 1.5) return 2;
+  if (vram >= m.size * 0.6 || ram >= m.size + 4) return 1;
+  if (ram >= m.size + 1) return 0;
+  return -1;
+}
+
 // helper models: they cannot run alone, they only speed up a big model of the same family (speculative decoding)
 const DRAFTS = [
   { id: 'draft-qwen35', name: 'Qwen3.5 0.8B', repos: ['unsloth/Qwen3.5-0.8B-GGUF', 'bartowski/Qwen_Qwen3.5-0.8B-GGUF', 'lmstudio-community/Qwen3.5-0.8B-GGUF'], quant: 'Q8_0', size: 0.8, layers: 24 },
@@ -78,7 +128,7 @@ function helperCard(d, i) {
 function allModels() {
   return [...CATALOG, ...(S.st.customModels || []).map(c => ({ id: c.id, cat: 'mine', name: c.name, path: c.path, size: c.sizeGB || 5, layers: 32, kv: 64, tags: ['general', 'code'], ru: 'Твоя модель с диска', en: 'Your model from disk' }))];
 }
-const CATS = [['fast', 'catFast'], ['code', 'catCode'], ['logic', 'catLogic'], ['power', 'catPower']];
+const CATS = [['tiny', 'catTiny'], ['fast', 'catFast'], ['code', 'catCode'], ['logic', 'catLogic'], ['power', 'catPower']];
 
 const S = { partial: {}, chats: [], chatId: null, st: {}, tab: 'models', local: new Set(), dl: {}, running: null, engine: null, msgs: [], streaming: null, busy: null };
 const T = k => (I18N[S.st.lang || 'ru'] || I18N.ru)[k] ?? k;
@@ -241,7 +291,7 @@ async function appScreen() {
   P.monitor(S.st.load !== false);
 }
 function renderNav() {
-  const tabs = [['chat', 'tChat'], ['projects', 'tProjects'], ['models', 'tModels'], ['agents', 'tAgents'], ['design', 'tDesign'], ['settings', 'tSettings']];
+  const tabs = [['chat', 'tChat'], ['projects', 'tProjects'], ['models', 'tModels'], ['images', 'tImages'], ['agents', 'tAgents'], ['design', 'tDesign'], ['settings', 'tSettings']];
   const hw = S.st.hw || {}; const [pname] = profile();
   const sp = S.running && S.st.speed && S.st.speed[S.running];
   $('#nav').innerHTML = `<div class="brand"><div class="dot led"></div>PULSAR</div>
@@ -260,7 +310,7 @@ function renderMain() {
   if (!same) { m.classList.remove('swap'); void m.offsetWidth; m.classList.add('swap'); }
   m.style.padding = S.tab === 'chat' ? '48px 56px 28px' : '';
   if (S.tab === 'projects') { m.innerHTML = viewProjects(); loadProjects(); }
-  else m.innerHTML = ({ chat: viewChat, models: viewModels, agents: viewAgents, design: viewDesign, settings: viewSettings }[S.tab] || viewChat)();
+  else m.innerHTML = ({ chat: viewChat, models: viewModels, images: viewImages, agents: viewAgents, design: viewDesign, settings: viewSettings }[S.tab] || viewChat)();
   if (S.tab === 'chat') { hookScroll(); const box = $('#msgs'); toBottom(box); $('#input')?.focus(); showBoost(); showVision(); }
 }
 
@@ -334,6 +384,14 @@ async function downloadModel(id) {
 }
 function dlText(d, m) { return `${(d.got / 1073741824).toFixed(2)} / ${(d.total / 1073741824 || m.size).toFixed(2)} ${T('gb')} · ${d.total ? Math.floor(d.got / d.total * 100) : 0}%`; }
 P.onProgress(({ id, got, total }) => {
+  // image models report under "img:<id>" and live in their own tab
+  if (id.startsWith('img:')) {
+    const k = id.slice(4);
+    if (!S.imgDl[k]) return;
+    S.imgDl[k] = { got, total: total || S.imgDl[k].total };
+    if (S.tab === 'images') { S._lastTab = 'images'; renderMain(); }
+    return;
+  }
   if (!S.dl[id]) return; S.dl[id] = { got, total: total || S.dl[id].total };
   if (S.tab !== 'models') return;
   const bar = document.getElementById('pg-' + id), txt = document.getElementById('pt-' + id);
@@ -519,7 +577,7 @@ function viewAgents() {
     <span class="mono" style="font-size:12px">${cur === a[0] ? '● ' + T('chosen') : '○'}</span></button>`).join('')}</div>`;
 }
 
-// ---------- APIs: paste a key, give it a name, done ----------
+// ---------- APIs: paste a key, done ----------
 // Picking models by hand is gone: the key is checked, every model it offers is connected at once,
 // and which one answers is chosen in the chat.
 const GOOD_API = /gpt-5|gpt-4\.1|claude-(opus|sonnet)|gemini-[23]\.\d-(pro|flash)|grok-[34]|deepseek-(chat|v3)|qwen3\.5|llama-4|kimi-k2|glm-4\.\d|mistral-large/i;
@@ -534,11 +592,10 @@ function apiPanel() {
   return `<div class="fu" style="display:flex;flex-direction:column;gap:14px">
     <div class="muted small">${T('apiSub3')}</div>
     <label class="field">${T('apiKey')}<input id="aKey" type="text" spellcheck="false" class="mono" placeholder="sk-… · gsk_… · AIza… · sk-ant-… · sk-or-…" value="${esc(c.key || '')}" autocomplete="off"></label>
-    <label class="field">${T('apiName')}<input id="aName" class="mono" placeholder="${T('apiNamePh')}" value="${esc(S.apiName || '')}" autocomplete="off"></label>
     ${status}
     <div class="sec" style="margin-top:8px">${T('apiConnected')} · ${apis.length}</div>
     ${apis.length ? apis.map((a, i) => `<div class="card apicard fu" style="animation-delay:${.05 * i}s">
-      <div class="row"><span style="display:flex;flex-direction:column;gap:4px"><span style="font-size:18px;font-weight:400">${esc(a.name)}</span><span class="mono small muted">${T('apiModelsN')((a.models || [a.model]).length)} · ${T('apiNow')}: ${esc(a.model)} · ••••${esc((a.key || '').slice(-4))}</span></span>
+      <div class="row"><span style="display:flex;flex-direction:column;gap:4px"><span style="font-size:18px;font-weight:400">${esc(a.model)}</span><span class="mono small muted">${T('apiModelsN')((a.models || [a.model]).length)} · ••••${esc((a.key || '').slice(-4))}</span></span>
       <span style="display:flex;align-items:center;gap:12px"><span class="mono small apiok">● ${a.err ? esc(a.err) : T('apiOn')}</span><button class="btn ghost sm" data-act="apiDel" data-v="${i}">${T('del')}</button></span></div></div>`).join('')
       : `<div class="muted small">${T('apiNone')}</div>`}
   </div>`;
@@ -546,18 +603,19 @@ function apiPanel() {
 async function apiCheckNow() {
   const key = ($('#aKey')?.value || '').trim();
   if (!key) return;
-  const nm = ($('#aName')?.value || '').trim();
   S.apiCheck = { state: 'work', key }; S._lastTab = 'settings'; renderMain(); Sound.soft();
   const r = await P.apiCheck(key, '').catch(e => ({ ok: false, error: String(e.message || e) }));
   if (!r.ok) { S.apiCheck = { state: 'err', key, error: r.error }; Sound.tick(700); renderMain(); return; }
   const model = pickDefaultModel(r.models);
-  const entry = { name: nm || r.provider, url: r.url, key, kind: r.kind, model, models: r.models.map(m => m.id) };
+  // No name is asked for and no service name is stored: PULSAR used to guess the service from
+  // which endpoint answered first and got it wrong. The model's own id is never a guess.
+  const entry = { url: r.url, key, kind: r.kind, model, models: r.models.map(m => m.id) };
   const same = (S.st.apis || []).findIndex(a => a.url === entry.url && a.key === entry.key);
   const list = [...(S.st.apis || [])];
   same >= 0 ? list[same] = { ...list[same], ...entry } : list.push(entry);
   await save({ apis: list });
-  S.apiCheck = {}; S.apiName = '';
-  toast(T('apiAddedAll')(entry.name, entry.models.length)); Sound.done();
+  S.apiCheck = {};
+  toast(T('apiAddedAll')(entry.models.length)); Sound.done();
   S._lastTab = 'settings'; renderMain();
 }
 // ---------- design ----------
@@ -575,6 +633,73 @@ function viewDesign() {
   <div class="sec fu" style="animation-delay:.3s;margin-top:30px">${T('designBlocks')(DESIGN.BLOCKS.length, DESIGN.EXAMPLES.length)}</div>
   <div class="chips fu" style="animation-delay:.32s;flex-wrap:wrap;max-width:860px">${DESIGN.BLOCKS.map(b => `<span class="pill">${esc(b[1])}</span>`).join('')}</div>`;
 }
+
+// ---------- image generation ----------
+S.imgDl = {}; S.imgHave = new Set(); S.imgOut = [];
+const imgModel = () => IMG_CATALOG.find(m => m.id === (S.st.imgModel || '')) || null;
+function imgCard(m, i) {
+  const fit = imgFit(m), d = S.imgDl[m.id], have = S.imgHave.has(m.id), cur = S.st.imgModel === m.id;
+  const fk = fit === 2 ? 'fit2' : fit === 1 ? 'fit1' : fit === 0 ? 'fit0' : 'fitx';
+  let actions;
+  if (d) actions = `<div class="track"><div style="width:${d.total ? (d.got / d.total * 100).toFixed(1) : 0}%"></div></div>
+    <div class="row small muted"><span class="mono">${d.total ? ((d.got / 1073741824).toFixed(1) + ' / ' + (d.total / 1073741824).toFixed(1) + ' ' + T('gb')) : T('loading')}</span><button class="btn ghost sm" data-act="imgCancelDl" data-v="${m.id}">${T('cancel')}</button></div>`;
+  else if (have) actions = `<div class="row"><button class="btn sm" style="flex:1" data-act="imgUse" data-v="${m.id}" ${cur ? 'disabled' : ''}>${cur ? T('imgChosen') : T('imgUse')}</button><button class="btn ghost sm" data-act="imgDel" data-v="${m.id}">${T('del')}</button></div>`;
+  else actions = `<button class="btn ghost sm" data-act="imgDl" data-v="${m.id}">${T('download')}</button>`;
+  return `<div class="card fu ${cur ? 'on' : ''}" style="animation-delay:${.1 + i * .05}s;cursor:default">
+    <div class="row"><span style="font-size:20px;font-weight:400">${esc(m.name)}${m.fresh ? `<span class="newb" style="margin-left:10px">new</span>` : ''}</span><span class="${fk}" style="padding:2px 10px;border-radius:10px;font-size:12px">${T(fit === 2 ? 'fit2' : fit === 1 ? 'fit1' : fit === 0 ? 'fit0' : 'fitx')}</span></div>
+    <span class="muted" style="font-size:14px;line-height:1.5">${esc(m[L()] || m.ru)}</span>
+    <span class="mono small muted">${m.size} ${T('gb')} · ${m.w}×${m.h} · ${T('imgSteps')(m.steps)}</span>
+    ${actions}</div>`;
+}
+function viewImages() {
+  const cur = imgModel(), st = S.imgStatus;
+  const busy = !!S.imgBusy;
+  const form = cur ? `<div class="sec fu" style="animation-delay:.06s">${T('imgMake')} · ${esc(cur.name)}</div>
+    <div class="fu imgform" style="animation-delay:.08s">
+      <textarea id="imgP" rows="3" placeholder="${T('imgPh')}" ${busy ? 'disabled' : ''}>${esc(S.imgPrompt || '')}</textarea>
+      <div class="row" style="gap:10px;flex-wrap:wrap;justify-content:flex-start">
+        <select class="pick" data-act="imgSize">${['512x512', '768x768', '1024x1024', '1024x576', '576x1024'].map(x => `<option value="${x}" ${(S.st.imgSize || `${cur.w}x${cur.h}`) === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+        <button class="btn sm" data-act="${busy ? 'imgStop' : 'imgGo'}">${busy ? T('stop') : T('imgGo')}</button>
+        <button class="btn ghost sm" data-act="imgFolder">${T('imgFolder')}</button>
+      </div>
+      ${busy ? statusHTML(st && st.stage === 'engine' ? T('imgEngine') : st && st.stage === 'unpack' ? T('eUnpack') : st && st.step ? T('imgStep')(st.step, st.total) : T('imgRender')) : ''}
+    </div>
+    ${S.imgOut.length ? `<div class="imggrid fu" style="animation-delay:.1s">${S.imgOut.slice(0, 12).map((o, i) => `<button class="imgcell" data-act="imgShow" data-v="${esc(o.file)}" style="animation-delay:${i * .04}s"><img src="${esc(o.url)}" alt=""><span class="mono small">${esc((o.prompt || '').slice(0, 60))}</span></button>`).join('')}</div>` : ''}` : '';
+  const groups = IMG_CATS.map(c => {
+    const list = IMG_CATALOG.filter(m => m.cat === c[0]).sort((a, b) => imgFit(b) - imgFit(a));
+    return `<div class="sec fu">${T(c[1])}</div><div class="grid">${list.map((m, i) => imgCard(m, i)).join('')}</div>`;
+  }).join('');
+  return `<h2 class="fu">${T('tImages')}</h2><p class="sub fu" style="animation-delay:.04s">${T('imgSub')}</p>
+    ${form}<div style="margin-top:${cur ? 34 : 0}px">${groups}</div>`;
+}
+async function imgDownload(id) {
+  const m = IMG_CATALOG.find(x => x.id === id); if (!m || S.imgDl[id]) return;
+  if (imgFit(m) < 0 && !confirm(T('warnHeavy'))) return;
+  S.imgDl[id] = { got: 0, total: 0 }; if (S.tab === 'images') { S._lastTab = 'images'; renderMain(); }
+  const r = await P.img.download({ id, repos: m.repos, quant: 'q4' });
+  delete S.imgDl[id];
+  if (r.ok) { S.imgHave.add(id); Sound.done(); if (!S.st.imgModel) await save({ imgModel: id }); }
+  else if (!/abort/i.test(r.error || '')) toast(T('dlError') + ': ' + r.error);
+  if (S.tab === 'images') { S._lastTab = 'images'; renderMain(); }
+}
+async function imgGenerate() {
+  const m = imgModel(); if (!m || S.imgBusy) return;
+  const prompt = ($('#imgP')?.value || '').trim();
+  if (!prompt) { toast(T('imgNoPrompt')); return; }
+  S.imgPrompt = prompt; S.imgBusy = true; S.imgStatus = null; S._lastTab = 'images'; renderMain(); Sound.soft();
+  const [w, h] = (S.st.imgSize || `${m.w}x${m.h}`).split('x').map(Number);
+  const r = await P.img.make({ id: m.id, prompt, steps: m.steps, cfg: m.cfg, w, h });
+  S.imgBusy = false; S.imgStatus = null;
+  if (r.ok) { S.imgOut.unshift({ ...r, prompt }); Sound.done(); }
+  else if (!/abort|kill/i.test(r.error || '')) toast(T('imgError') + ': ' + r.error);
+  S._lastTab = 'images'; renderMain();
+}
+P.onImg(st => {
+  S.imgStatus = st;
+  if (S.tab !== 'images' || !S.imgBusy) return;
+  const el = document.querySelector('.imgform .pstat');
+  if (el) el.textContent = st.stage === 'engine' ? T('imgEngine') : st.stage === 'unpack' ? T('eUnpack') : st.step ? T('imgStep')(st.step, st.total) : T('imgRender');
+});
 
 // ---------- projects ----------
 async function loadProjects() {
@@ -623,8 +748,8 @@ function sources() {
   const out = [], apis = S.st.apis || [];
   const lm = S.running && allModels().find(x => x.id === S.running);
   if (S.running) out.push(['local', `${T('srcPc')} · ${lm ? lm.name : S.running}`]);
-  apis.forEach((a, i) => out.push(['api:' + i, `API · ${a.name} · ${a.model}`]));
-  if (S.running) apis.forEach((a, i) => out.push(['tog:' + i, `${T('srcTog')} · ${lm ? lm.name : 'ПК'} + ${a.model}`]));
+  apis.forEach((a, i) => out.push(['api:' + i, `API · ${a.model}`]));
+  if (S.running) apis.forEach((a, i) => out.push(['tog:' + i, `${T('srcTog')} · ${lm ? lm.name : T('srcPc')} + ${a.model}`]));
   return out;
 }
 const ICON = {
@@ -706,7 +831,8 @@ function liveStatus(c) {
   }
   return T('stWriting');
 }
-const statusHTML = txt => `<div class="status"><span class="dot led"></span><span class="shimmer">${esc(txt)}</span></div>`;
+// three pulsing dots carry "working"; the words sit beside them, small and quiet
+const statusHTML = txt => `<div class="status"><span class="pdots" aria-hidden="true"><i></i><i></i><i></i></span><span class="pstat">${esc(txt)}</span></div>`;
 
 function viewChat() {
   const src = sources();
@@ -843,7 +969,7 @@ function setSendBtn() { const b = root.querySelector('.send'); if (!b) return; b
 const designOn = () => S.st.design !== false, designTheme = () => S.st.designTheme || 'apple';
 const LOCAL_T = { base: 'http://127.0.0.1:18089/v1', key: '', model: 'local', kind: 'local', local: true };
 const isTog = sel => /^tog:/.test(sel || ''), isApi = sel => /^api:/.test(sel || '');
-function apiT(i) { const a = (S.st.apis || [])[+i]; return a ? { base: a.url, key: a.key, model: a.model, kind: a.kind || 'openai', name: a.name } : null; }
+function apiT(i) { const a = (S.st.apis || [])[+i]; return a ? { base: a.url, key: a.key, model: a.model, kind: a.kind || 'openai', name: a.model } : null; }
 // "together" answers through the API by default; the local model joins in debate() and in builds
 function target(sel) { sel = sel || S.sel; if (isApi(sel) || isTog(sel)) return apiT(sel.split(':')[1]) || LOCAL_T; return LOCAL_T; }
 const VISION_API = /gpt-4o|gpt-4\.1|gpt-5|\bo[34]\b|o4-mini|claude|gemini|vision|[-_.]vl\b|-vl-|llava|pixtral|grok-(2-vision|4)|llama-4|qwen.*(vl|3\.5|omni)|kimi-k2\.[5-9]|glm-4\.\dv|gemma-?3|gemma-?4|mistral-(medium|small)/i;
@@ -918,7 +1044,19 @@ function loopCut(t) {
   if (last && last.trim().length > 3 && lines.length >= 8 && lines.slice(-8).every(x => x === last)) { let n = 0; for (let i = lines.length - 1; i >= 0 && lines[i] === last; i--) n++; return (n - 1) * (last.length + 1); }
   return 0;
 }
-const noThink = s => s.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim();
+const noThink = s => stripLeakedThought(s.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim());
+// Some models narrate their reasoning as plain text instead of wrapping it in <think>:
+// "The user is asking me to write a calculator. According to my instructions, I should..."
+// It is always at the start, always in English about "the user", and the real answer follows it.
+const THOUGHT_RE = /^(?:\s*(?:the user|they|i should|i'll|i will|let me|okay|alright|first,|according to my instructions|based on my instructions)\b[^\n]*\n?)+/i;
+function stripLeakedThought(t) {
+  if (!t) return t;
+  const m = t.match(THOUGHT_RE);
+  if (!m) return t;
+  const rest = t.slice(m[0].length).trim();
+  // only drop it when a real answer is left behind, so an English answer is never eaten
+  return rest.length > 40 ? rest : t;
+}
 const REFUSAL = /(не (имею|могу|умею)[^.\n]{0,80}(доступ|сохран|открыва|браузер|файл|компьютер|пк|интернет))|(у меня нет[^.\n]{0,40}(доступ|браузер))|(я (всего лишь|лишь|только)? ?текстов)|(I (can't|cannot|don't|do not)[^.\n]{0,80}(access|save|open|browse|file|computer|internet))|(text-based (AI|assistant))/i;
 // old action results and action blocks are dropped, so the model never redoes earlier requests
 // ---------- context budget ----------
@@ -1080,7 +1218,12 @@ function openIntent(t) {
   return null;
 }
 const SAVE_RE = /(сохрани|сохранить|сохраняй|на пк|на компьютер|на комп|в файл|создай файл|запиши|\bsave\b|to (a )?file)/i;
-const BUILD_RE = /(сделай|создай|напиши|сгенерируй|собери|переделай|доработай|улучши|make|build|create|write).{0,50}(сайт|страниц|лендинг|игр|программ|скрипт|бот|калькулятор|приложени|site|page|game|program|script|app|calculator)/i;
+// A build request is a verb plus a thing, in EITHER order: "напиши калькулятор" and
+// "калькулятор напиши" are the same ask. The old rule only matched verb-then-noun, so the
+// reversed form fell through to plain chat and nothing got built.
+const BUILD_VERB = /(сделай|сделать|создай|создать|напиши|написать|сгенерируй|собери|собрать|построй|сверстай|свёрстай|переделай|доработай|улучши|запили|накидай|make|build|create|write|code|generate)/i;
+const BUILD_THING = /(сайт|страниц|лендинг|игр[уаы]?\b|игру|программ|скрипт|бот[ае]?\b|бота|калькулятор|приложени|таймер|секундомер|todo|тудушк|список дел|парсер|конвертер|генератор|форм[уы]\b|анкет|викторин|тест\b|лаунчер|утилит|site|page|landing|game|program|script|bot|calculator|timer|parser|converter|generator|quiz|form\b|app\b)/i;
+const BUILD_RE = new RegExp(`(${BUILD_VERB.source}).{0,60}(${BUILD_THING.source})|(${BUILD_THING.source}).{0,60}(${BUILD_VERB.source})`, 'i');
 const SEARCH_RE = /(найди|поищи|загугли|что нового|новост|курс|погода|search|look up|find)/i;
 const TR = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya' };
 const slug = s => (s || '').toLowerCase().split('').map(c => TR[c] ?? c).join('').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32);
@@ -1445,7 +1588,7 @@ async function debate(msg, idx, messages, userText, signal) {
   const lm = findM(S.running), lang = L() === 'ru' ? 'Russian' : 'English';
   const P = [];
   if (lm) P.push({ name: `${T('srcPc')} · ${lm.name}`, t: LOCAL_T });
-  (S.st.apis || []).forEach((a, i) => { const t = apiT(i); if (t) P.push({ name: `${a.name} · ${a.model}`, t }); });
+  (S.st.apis || []).forEach((a, i) => { const t = apiT(i); if (t) P.push({ name: `API · ${a.model}`, t }); });
   msg.debate = true; msg.live = false; msg.parts = [];
   const step = (list, task) => list.map(p => { const x = { name: p.name, task, status: 'work', content: '', t: p.t }; msg.parts.push(x); return x; });
   const run = async (x, msgs, extra) => { try { await stream(msgs, signal, c => { x.content += c; paint(idx); }, extra, { tgt: x.t }); x.status = 'done'; } catch (e) { if (e.name === 'AbortError') throw e; x.status = 'error'; x.content += '\n⚠ ' + (e.message || e); } paint(idx); };
@@ -2013,6 +2156,14 @@ root.addEventListener('click', async e => {
     case 'projEdit': openEditor(v); break;
     case 'projFolder': P.ws.openFile(v); break;
     case 'projDel': await deleteProject(v); break;
+    case 'imgDl': imgDownload(v); break;
+    case 'imgCancelDl': await P.img.cancel(); break;
+    case 'imgDel': await P.img.del(v); S.imgHave.delete(v); if (S.st.imgModel === v) await save({ imgModel: null }); S._lastTab = 'images'; renderMain(); break;
+    case 'imgUse': await save({ imgModel: v }); Sound.tick(1500); S._lastTab = 'images'; renderMain(); break;
+    case 'imgGo': imgGenerate(); break;
+    case 'imgStop': await P.img.cancel(); break;
+    case 'imgFolder': P.img.folder(); break;
+    case 'imgShow': P.img.open(v); break;
     case 'exportChat': await exportChat(v); break;
     case 'fileVers': await showVersions(v); break;
     case 'fileRestore': { const [rel, file] = String(v).split('|'); await P.ws.restore(rel, file); toast(T('verRestored')); if (S.editFile === rel) openEditor(rel); break; }
@@ -2043,6 +2194,7 @@ document.addEventListener('keydown', e => {
 root.addEventListener('change', async e => {
   const t = e.target;
   if (t.dataset.act === 'sel') { S.sel = t.value; save({ sel: t.value }); Sound.tick(1500); showVision(); renderMain(); }
+  if (t.dataset.act === 'imgSize') { await save({ imgSize: t.value }); }
   if (t.dataset.act === 'apiModelSel') {
     const i = +t.dataset.v, l = [...(S.st.apis || [])];
     if (l[i]) { l[i] = { ...l[i], model: t.value }; await save({ apis: l }); Sound.tick(1500); showVision(); renderMain(); }
@@ -2054,7 +2206,6 @@ root.addEventListener('keydown', e => {
 });
 root.addEventListener('input', e => {
   if (e.target.id === 'input') { e.target.style.height = 'auto'; e.target.style.height = Math.min(200, e.target.scrollHeight) + 'px'; }
-  if (e.target.id === 'aName') S.apiName = e.target.value;
   if (e.target.id === 'aKey') { clearTimeout(S._ak); const v = e.target.value.trim(); if (v.length >= 20 && !/\s/.test(v) && S.apiCheck?.key !== v) S._ak = setTimeout(apiCheckNow, 700); }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'aKey') { e.preventDefault(); clearTimeout(S._ak); apiCheckNow(); } });
@@ -2088,6 +2239,7 @@ function applyTheme() { document.documentElement.classList.toggle('light', S.st.
 (async () => {
   S.st = await P.getSettings(); applyTheme();
   P.version().then(v => { S.version = v; }).catch(() => {});
+  P.img.have().then(l => { S.imgHave = new Set(l); }).catch(() => {});
   if (S.st.apis) {
     // 1.x stored one entry per model; 2.0 stores one entry per key with all of its models
     const merged = [];
