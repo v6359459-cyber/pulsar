@@ -77,6 +77,11 @@ full file content
 \`\`\`
 \`\`\`search:what to look up
 \`\`\`
+\`\`\`ask:What exactly should it be?
+first option
+second option
+\`\`\`
+ask: asks the user a question as a card with buttons. Put the question after the colon and one option per line inside the block, 2 to 4 options. Use it whenever the task is ambiguous and the wrong guess would waste the work, and ALWAYS when the user asks you to ask questions. Never write a question as plain text in your answer and never invent your own numbered list of choices — use this block, it is the only way the user can answer you. After the block, stop and wait.
 file: creates or overwrites a file. run: runs a .py or .js file (stdin is closed, so avoid input(); use fixed example values) or opens an .html file in the built-in preview. read: reads a file. list: lists a folder. read: and list: also accept a full path anywhere on the computer (read:C:\\Users\\Name\\Downloads\\notes.txt) — but file:, mkdir: and move: only work inside the workspace folder. mkdir:folder creates a folder. move:old/path|new/path moves or renames a file or folder (nothing is ever deleted; the user is asked first). open: opens a website in the built-in browser and gives you its text. search: searches the internet and gives you results with links.
 When the user asks to make a website or program, write the COMPLETE code in one file block (for a site: one html file with CSS and JS inside, modern clean design). When the user asks to open a site, use open:. Never answer that you cannot save files, open websites or access the internet: you can, with these blocks.
 After your blocks, stop. The results come back to you in the next message; then continue or give the final answer. Do not repeat a block that already succeeded. Answer in the user's language.`;
@@ -303,3 +308,9 @@ Object.assign(I18N.en, {
   imgAgent: 'PULSAR · image', imgNoModel: 'Download and run an image model in Models first.',
   imgDone: n => `Drawn with ${n}. Click the picture to open it.`
 });
+Object.assign(I18N.ru, { imgStarting: 'Запускаю…', imgEngineFail: 'Не удалось подготовить движок для картинок' });
+Object.assign(I18N.en, { imgStarting: 'Starting…', imgEngineFail: 'Could not prepare the image engine' });
+Object.assign(I18N.ru, { apiManualD: 'Этот сервис не отдаёт список моделей. Впиши адрес API и название модели — PULSAR проверит их одним запросом.', apiModelName: 'Название модели', apiManualNeed: 'Нужны и ключ, и адрес, и название модели' });
+Object.assign(I18N.en, { apiManualD: 'This service does not share its model list. Enter the API address and the model name — PULSAR will verify them with one request.', apiModelName: 'Model name', apiManualNeed: 'Key, address and model name are all required' });
+Object.assign(I18N.ru, { qOwnPh: 'Свой ответ…', qSend: 'Ответить', qDefault: 'Уточняю' });
+Object.assign(I18N.en, { qOwnPh: 'Your own answer…', qSend: 'Answer', qDefault: 'A question' });

@@ -392,7 +392,10 @@ P.onProgress(({ id, got, total }) => {
     const k = id.slice(4);
     if (!S.imgDl[k]) return;
     S.imgDl[k] = { got, total: total || S.imgDl[k].total };
-    if (S.tab === 'models') { S._lastTab = 'models'; renderMain(); }
+    if (S.tab !== 'models') return;
+    const bar = document.getElementById('ipg-' + k), txt = document.getElementById('ipt-' + k);
+    if (bar) bar.style.width = (S.imgDl[k].total ? S.imgDl[k].got / S.imgDl[k].total * 100 : 0).toFixed(1) + '%';
+    if (txt) txt.textContent = sizeText(S.imgDl[k].got) + (S.imgDl[k].total ? ' / ' + sizeText(S.imgDl[k].total) : '');
     return;
   }
   if (!S.dl[id]) return; S.dl[id] = { got, total: total || S.dl[id].total };
@@ -596,6 +599,12 @@ function apiPanel() {
     <div class="muted small">${T('apiSub3')}</div>
     <label class="field">${T('apiKey')}<input id="aKey" type="text" spellcheck="false" class="mono" placeholder="sk-… · gsk_… · AIza… · sk-ant-… · sk-or-…" value="${esc(c.key || '')}" autocomplete="off"></label>
     ${status}
+    ${c.manual ? `<div class="manualapi fu">
+      <div class="small muted">${T('apiManualD')}</div>
+      <label class="field">${T('apiUrlOpt')}<input id="aUrl" class="mono" placeholder="https://api.example.com/v1" value="${esc(c.url0 || '')}" autocomplete="off"></label>
+      <label class="field">${T('apiModelName')}<input id="aModel" class="mono" placeholder="gpt-4o · deepseek-chat · …" value="${esc(c.model0 || '')}" autocomplete="off"></label>
+      <button class="btn sm" data-act="apiManual">${T('apiCheckBtn')}</button>
+    </div>` : ''}
     <div class="sec" style="margin-top:8px">${T('apiConnected')} · ${apis.length}</div>
     ${apis.length ? apis.map((a, i) => `<div class="card apicard fu" style="animation-delay:${.05 * i}s">
       <div class="row"><span style="display:flex;flex-direction:column;gap:4px"><span style="font-size:18px;font-weight:400">${esc(a.model)}</span><span class="mono small muted">${T('apiModelsN')((a.models || [a.model]).length)} · ••••${esc((a.key || '').slice(-4))}</span></span>
@@ -603,12 +612,28 @@ function apiPanel() {
       : `<div class="muted small">${T('apiNone')}</div>`}
   </div>`;
 }
+async function apiConnectManual() {
+  const key = ($('#aKey')?.value || '').trim();
+  const url = ($('#aUrl')?.value || '').trim();
+  const model = ($('#aModel')?.value || '').trim();
+  if (!key || !url || !model) { toast(T('apiManualNeed')); return; }
+  S.apiCheck = { state: 'work', key, url0: url, model0: model, manual: true }; S._lastTab = 'settings'; renderMain(); Sound.soft();
+  const kind = /anthropic\.com/.test(url) ? 'anthropic' : 'openai';
+  const a = { url: url.replace(/\/$/, ''), key, kind, model, models: [model] };
+  const r = await P.apiPing(a).catch(e => ({ ok: false, error: String(e.message || e) }));
+  if (!r.ok) { S.apiCheck = { state: 'err', key, url0: url, model0: model, manual: true, error: r.error }; Sound.tick(700); renderMain(); return; }
+  const list = [...(S.st.apis || [])];
+  const same = list.findIndex(x => x.url === a.url && x.key === a.key);
+  same >= 0 ? list[same] = { ...list[same], ...a, models: [...new Set([...(list[same].models || []), model])] } : list.push(a);
+  await save({ apis: list });
+  S.apiCheck = {}; toast(T('apiAddedAll')(1)); Sound.done(); S._lastTab = 'settings'; renderMain();
+}
 async function apiCheckNow() {
   const key = ($('#aKey')?.value || '').trim();
   if (!key) return;
   S.apiCheck = { state: 'work', key }; S._lastTab = 'settings'; renderMain(); Sound.soft();
   const r = await P.apiCheck(key, '').catch(e => ({ ok: false, error: String(e.message || e) }));
-  if (!r.ok) { S.apiCheck = { state: 'err', key, error: r.error }; Sound.tick(700); renderMain(); return; }
+  if (!r.ok) { S.apiCheck = { state: 'err', key, error: r.error, manual: !!r.needManual }; Sound.tick(700); renderMain(); return; }
   const model = pickDefaultModel(r.models);
   // No name is asked for and no service name is stored: PULSAR used to guess the service from
   // which endpoint answered first and got it wrong. The model's own id is never a guess.
@@ -644,9 +669,9 @@ function imgCard(m, i) {
   const fit = imgFit(m), d = S.imgDl[m.id], have = S.imgHave.has(m.id), run = S.imgRunning === m.id;
   const fk = fit === 2 ? 'fit2' : fit === 1 ? 'fit1' : fit === 0 ? 'fit0' : 'fitx';
   let actions;
-  if (d) actions = `<div class="track"><div style="width:${d.total ? (d.got / d.total * 100).toFixed(1) : 0}%"></div></div>
-    <div class="row small muted"><span class="mono">${sizeText(d.got)}${d.total ? ' / ' + sizeText(d.total) : ''}</span><button class="btn ghost sm" data-act="imgCancelDl" data-v="${m.id}">${T('cancel')}</button></div>`;
-  else if (have) actions = `<div class="row"><button class="btn sm" style="flex:1" data-act="imgUse" data-v="${m.id}" ${run ? 'disabled' : ''}>${run ? T('imgRunning') : T('imgRun')}</button><button class="btn ghost sm" data-act="imgDel" data-v="${m.id}">${T('del')}</button></div>`;
+  if (d) actions = `<div class="track"><div id="ipg-${m.id}" style="width:${d.total ? (d.got / d.total * 100).toFixed(1) : 0}%"></div></div>
+    <div class="row small muted"><span class="mono" id="ipt-${m.id}">${sizeText(d.got)}${d.total ? ' / ' + sizeText(d.total) : ''}</span><button class="btn ghost sm" data-act="imgCancelDl" data-v="${m.id}">${T('cancel')}</button></div>`;
+  else if (have) actions = `<div class="row"><button class="btn sm" style="flex:1" data-act="imgUse" data-v="${m.id}" ${run || S.imgStarting ? 'disabled' : ''}>${run ? T('imgRunning') : S.imgStarting === m.id ? T('imgStarting') : T('imgRun')}</button><button class="btn ghost sm" data-act="imgDel" data-v="${m.id}">${T('del')}</button></div>`;
   else actions = `<button class="btn ghost sm" data-act="imgDl" data-v="${m.id}">${S.imgPartial && S.imgPartial[m.id] ? T('resumeDl') + ' · ' + sizeText(S.imgPartial[m.id]) : T('download')}</button>`;
   return `<div class="card fu ${run ? 'on' : ''}" style="animation-delay:${.1 + i * .04}s;cursor:default">
     <div class="row"><span style="font-size:20px;font-weight:400">${esc(m.name)}${m.fresh ? `<span class="newb" style="margin-left:10px">new</span>` : ''}</span><span class="${fk}" style="padding:2px 10px;border-radius:10px;font-size:12px">${T(fit === 2 ? 'fit2' : fit === 1 ? 'fit1' : fit === 0 ? 'fit0' : 'fitx')}</span></div>
@@ -659,19 +684,26 @@ async function imgDownload(id) {
   const m = IMG_CATALOG.find(x => x.id === id); if (!m || S.imgDl[id]) return;
   if (imgFit(m) < 0 && !confirm(T('warnHeavy'))) return;
   S.imgDl[id] = { got: 0, total: 0 }; if (S.tab === 'models') { S._lastTab = 'models'; renderMain(); }
+  // from here on the card is patched in place, never re-rendered
   const r = await P.img.download({ id, repos: m.repos, quant: 'q4' });
   delete S.imgDl[id];
   S.imgPartial = await P.img.partials().catch(() => S.imgPartial);
-  if (r.ok) { S.imgHave.add(id); Sound.done(); if (!S.st.imgModel) await save({ imgModel: id }); }
+  if (r.ok) { S.imgHave.add(id); Sound.done(); }
   else if (!/abort/i.test(r.error || '')) toast(T('dlError') + ': ' + r.error);
   if (S.tab === 'models') { S._lastTab = 'models'; renderMain(); }
 }
 // Only one model holds the video memory, so starting a drawing model stops the text one.
 async function runImgModel(id) {
-  if (S.imgRunning === id) return;
-  if (S.running) { await P.stop(); S.running = null; S.engine = null; S.sel = isApi(S.sel) || isTog(S.sel) ? S.sel : null; }
+  if (S.imgRunning === id || S.imgStarting) return;
+  S.imgStarting = id; S._lastTab = 'models'; renderMain();
+  // fetch the drawing engine here, not on the first prompt, so a failure is visible at Run time
+  const e = await P.img.engine();
+  S.imgStarting = null;
+  if (!e.ok) { S.imgRunning = null; toast(T('imgEngineFail') + ': ' + e.error); Sound.tick(700); S._lastTab = 'models'; renderMain(); return; }
+  // only one model holds the video memory, so the text model steps aside
+  if (S.running) { await P.stop(); S.running = null; S.engine = null; if (!isApi(S.sel) && !isTog(S.sel)) S.sel = null; }
   S.imgRunning = id; await save({ imgModel: id });
-  Sound.tick(1500); S._lastTab = 'models'; renderMain(); renderNav();
+  Sound.done(); S._lastTab = 'models'; renderMain(); renderNav();
   toast(T('imgReady'));
 }
 // "нарисуй кота" in the chat: recognised here, drawn by whichever image model is running
@@ -760,6 +792,7 @@ function sources() {
   return out;
 }
 const ICON = {
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.2 2.4c-.6.2-.9.7-.9 1.3v.3"/><path d="M12 17h.01"/>',
   eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
   speaker: '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
@@ -914,7 +947,7 @@ function msgInner(m) {
   if (m.debate) ctx = { acts: m.actions, k: 0 };
   const pctx = m.debate ? null : ctx;
   const head = m.stage === 'plan' ? statusHTML(T('planning')) : '';
-  const steps = m.parts.map(p => `<div class="step"><div class="row"><span style="font-size:15px;font-weight:400">${p.status === 'work' ? '<span class="dot led" style="display:inline-block;margin-right:8px"></span>' : ''}${esc(p.name)}</span>
+  const steps = m.parts.map(p => `<div class="step"><div class="row"><span style="font-size:15px;font-weight:400">${p.status === 'work' ? '<span class="pdots sm" aria-hidden="true"><i></i><i></i><i></i></span>' : ''}${esc(p.name)}</span>
     <span class="mono small muted">${p.status === 'work' ? '<span class="shimmer">' + liveStatus(p.content) + '</span>' : st[p.status]}</span></div><div class="small muted" style="margin-top:4px">${esc(p.task)}</div>
     ${p.content ? `<details ${p.status === 'work' ? 'open' : ''}><summary>···</summary><div class="body">${md(p.content, pctx)}</div></details>` : ''}</div>`).join('');
   const fin = m.stage === 'merge' && !m.content ? statusHTML(m.debate ? T('dbMerge') : T('merging')) : m.content ? `<div style="margin-top:14px">${md(m.debate ? stripMem(m.content) : m.content, m.debate ? ctx : undefined)}</div>` : '';
@@ -1143,7 +1176,7 @@ function toApi(list) {
 // --- actions ---
 let actSeq = 0;
 function parseActions(text) {
-  const out = []; const re = /```(file|run|read|list|mkdir|move|open|search|click|type|scroll|back):([^\n`]*)\n?([\s\S]*?)```/g; let m;
+  const out = []; const re = /```(file|run|read|list|mkdir|move|open|search|click|type|scroll|back|ask):([^\n`]*)\n?([\s\S]*?)```/g; let m;
   while ((m = re.exec(text))) out.push({ id: 'a' + (++actSeq), kind: m[1], arg: m[2].trim(), body: m[3].replace(/\n$/, ''), state: 'wait' });
   return out;
 }
@@ -1172,6 +1205,16 @@ async function askSite(msg, idx, url, label) {
 }
 // a full Windows path ("C:\Users\...") or a UNC share — read-only territory outside the workspace
 const isAbs = p => /^[a-z]:[\\/]/i.test(String(p || '')) || /^\\\\/.test(String(p || ''));
+// ```ask:the question``` with one option per line turns into a card and blocks until answered
+async function askQuestion(a, repaint) {
+  const opts = String(a.body || '').split('\n').map(x => x.replace(/^[-*\d.)\s]+/, '').trim()).filter(Boolean).slice(0, 4);
+  const card = { id: a.id, question: true, title: a.arg || T('qDefault'), options: opts, state: 'ask' };
+  const msg = S.msgs[S.msgs.length - 1];
+  msg.ask = card; repaint(); Sound.soft();
+  const answer = await new Promise(r => { S.pending[a.id] = r; });
+  msg.ask = null; repaint();
+  return answer;
+}
 async function execAction(a, repaint, auto) {
   a.state = 'work'; repaint();
   try {
@@ -1187,8 +1230,6 @@ async function execAction(a, repaint, auto) {
       if (/\.html?$/i.test(a.arg) && designOn() && DESIGN.uses(a.body)) a.body = DESIGN.apply(a.body, designTheme());
       await P.ws.write(a.arg, a.body); S.readFiles.add(a.arg); res = `File saved: ${a.arg}`;
       if (S.editFile === a.arg && ED) ED.set(a.body, a.arg);
-      const lang = (a.arg.split('.').pop() || '').toLowerCase();
-      if (/^(html?|py|js)$/.test(lang)) { const errs = await autoCheck({ lang: lang.startsWith('htm') ? 'html' : lang, code: a.body }, lang.startsWith('htm')); if (errs.length) { a.warn = errs.length; res += `\nPULSAR checked it and found problems — fix them and save the file again:\n- ${errs.join('\n- ')}`; } }
     }
     else if (a.kind === 'run') {
       let src = ''; try { src = await P.ws.read(a.arg); } catch (e) {}
@@ -1199,6 +1240,11 @@ async function execAction(a, repaint, auto) {
     }
     else if (a.kind === 'mkdir') { await P.ws.mkdir(a.arg); res = `Folder created: ${a.arg}`; }
     else if (a.kind === 'move') { const [f, t] = a.arg.split('|').map(x => x.trim()); if (!f || !t) throw new Error('use move:old|new'); await P.ws.move(f, t); res = `Moved ${f} → ${t}`; }
+    else if (a.kind === 'ask') {
+      const ans = await askQuestion(a, repaint);
+      if (!ans) { a.state = 'denied'; repaint(); return 'The user did not answer. Make the most reasonable choice yourself and carry on.'; }
+      a.answer = ans; res = `The user answered: ${ans}`;
+    }
     else if (a.kind === 'read') {
       S.readFiles.add(a.arg);
       const text = isAbs(a.arg) ? await P.pc.read(a.arg) : (await P.ws.read(a.arg)).slice(0, 8000);
@@ -1602,6 +1648,11 @@ async function askSave(msg, idx, paths) {
 }
 function askHTML(a) {
   if (!a || a.state === 'done') return '';
+  if (a.question) return `<div class="act askcard qcard">
+    <div class="qhead">${ico('help', 15)}<span>${esc(a.title)}</span></div>
+    <div class="qopts">${(a.options || []).map((o, i) => `<button class="qopt" data-act="qPick" data-v="${a.id}|${i}"><span class="qnum">${i + 1}</span><span>${esc(o)}</span></button>`).join('')}</div>
+    <form class="qown" data-act="qOwn" data-v="${a.id}"><input id="qi-${a.id}" placeholder="${T('qOwnPh')}" autocomplete="off"><button class="cb" type="submit">${T('qSend')}</button></form>
+  </div>`;
   if (a.choice) return `<div class="act askcard choice"><div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:16px;color:#fff">${esc(a.title)}</span><span class="small muted">${esc(a.desc || '')}</span></div>
     <div class="row" style="justify-content:flex-start;gap:8px;margin-top:12px"><button class="cb pri" data-act="allow" data-v="${a.id}">${T('yes')}</button><button class="cb" data-act="deny" data-v="${a.id}">${T('no')}</button></div></div>`;
   if (a.site) return permCard({ type: 'site', id: a.id, host: a.files[0], label: a.title, agent: S.curAgentName });
@@ -1786,7 +1837,7 @@ async function runChain(text, signal, plan) {
   S.curAgentName = 'PULSAR IN BROWSER';
   const lang = L() === 'ru' ? 'Russian' : 'English';
   const def = id => ourAgents().find(x => x[0] === id);
-  const ids = ['accept', (plan.urls.length || plan.research || plan.refs) && 'analyze', plan.multi && !plan.edit && 'plan', 'code', 'review', 'save'].filter(Boolean);
+  const ids = ['accept', (plan.urls.length || plan.research || plan.refs) && 'analyze', plan.multi && !plan.edit && 'plan', 'code', 'save'].filter(Boolean);
   const msg = { role: 'assistant', content: '', parts: [], chain: { stages: ids.map(id => ({ id, state: 'wait' })) } }; S.msgs.push(msg); const idx = S.msgs.length - 1; addMsg(idx);
   const stage = id => { let seen = false; for (const st of msg.chain.stages) { if (st.id === id) { st.state = 'work'; seen = true; } else if (!seen) st.state = 'done'; } paint(idx); };
   const finish = () => { msg.chain.stages.forEach(st => st.state = 'done'); paint(idx); };
@@ -1893,45 +1944,8 @@ async function runChain(text, signal, plan) {
     p.status = 'done'; paint(idx);
     return extractCode(p.content, plan.site);
   });
-  // 4. PULSAR runs every result, a second agent fixes the real errors it finds (up to 3 rounds)
-  stage('review');
-  await limitAll(codes.map((c, k) => ({ c, k })).filter(x => x.c), slots(), async ({ c, k }) => {
-    await waitCool();
-    const label = plan.site ? pages[k].file : T('chCode');
-    // The review stage costs a full generation per round, so it only starts when the machine
-    // actually found something. A clean 30-line calculator now finishes instead of sitting here.
-    const first = await autoCheck(c, plan.site);
-    if (!first.length) { part(coder[1] + ' · ' + T('chReview') + (pages.length > 1 ? ' #' + (k + 1) : ''), `${label} · ${T('chSkip')}`, 'done'); return; }
-    const p = part(coder[1] + ' · ' + T('chReview') + (pages.length > 1 ? ' #' + (k + 1) : ''), label);
-    // The reviewer used to be told to fix "anything else that is broken", ran three rounds and
-    // never checked whether it helped — so it rewrote working code and sometimes looped.
-    // Now: machine-found syntax problems only, two rounds, and every round must actually reduce
-    // the problem count or the previous version is put back.
-    let cur = c, fixedAny = false, problems = first;
-    const started = problems.length;
-    const until = Date.now() + 90000; // hard ceiling, so a stubborn file cannot eat the session
-    for (let round = 0; round < 2 && problems.length && Date.now() < until; round++) {
-      p.task = `${label} · ${T('chFixing')} ${round + 1}`; p.content += `\n${problems.join('\n')}\n`; paint(idx);
-      await waitCool();
-      const meta = {}; let out = '';
-      await stream([{ role: 'system', content: `You fix syntax errors in code. Fix ONLY the problems listed by the user, nothing else. Do not refactor, do not rename, do not restyle, do not add or remove features, do not "improve" anything. Return the COMPLETE file in ONE code block with every other line byte-identical to the input. Answer in ${lang}.` },
-        { role: 'user', content: `Fix exactly these problems and change nothing else:\n- ${problems.join('\n- ')}\n\nCode:\n\`\`\`${cur.lang}\n${cur.code}\n\`\`\`` }], signal, ch => { out += ch; p.content += ch; paint(idx); }, { temperature: 0.1 }, meta);
-      for (let r = 0; r < 2 && meta.finish === 'length'; r++) {
-        meta.finish = null;
-        await stream([{ role: 'system', content: 'Continue the code exactly where it stopped. No repetition.' },
-          { role: 'user', content: `Continue this ${cur.lang} file from where it stops. Output only the continuation.` },
-          { role: 'assistant', content: out.slice(-6000) }], signal, ch => { out += ch; p.content += ch; paint(idx); }, { temperature: 0.1 }, meta);
-      }
-      const fixed = extractCode(out, plan.site);
-      if (!fixed || fixed.code.length < cur.code.length * 0.8) break; // it dropped half the file: keep what we had
-      const after = await autoCheck(fixed, plan.site);
-      if (after.length >= problems.length) { p.content += `\n${T('chWorse')}\n`; break; } // no progress — roll back
-      cur = fixed; problems = after; fixedAny = true;
-    }
-    codes[k] = cur;
-    p.task = `${label} · ${problems.length ? T('chLeft')(problems.length) : fixedAny ? T('chFixed') : started ? T('chFixed') : 'OK'}`;
-    p.status = 'done'; paint(idx);
-  });
+  // 4. no review stage: the reviewer rewrote working code and cost a full generation per round.
+  //    What the model wrote is what gets saved.
   // 5. one permission for all files, then save and show
   stage('save');
   const valid = codes.filter(Boolean);
@@ -2153,6 +2167,7 @@ root.addEventListener('click', async e => {
     case 'designTheme': if (e.target.closest('[data-act=designPreview]')) break; await save({ designTheme: v }); Sound.tick(1500); S._lastTab = 'design'; renderMain(); break;
     case 'designPreview': { const k = Math.floor(Math.random() * DESIGN.EXAMPLES.length); browse('data:text/html;charset=utf-8,' + encodeURIComponent(DESIGN.preview(v, k)), true); break; }
     case 'apiCheck': await apiCheckNow(); break;
+    case 'apiManual': await apiConnectManual(); break;
     case 'apiModel': { const [i, mid] = String(v).split('|'); const l = [...(S.st.apis || [])]; if (l[+i]) { l[+i] = { ...l[+i], model: mid }; await save({ apis: l }); showVision(); renderMain(); } break; }
     case 'apiDel': { const l = [...(S.st.apis || [])]; l.splice(+v, 1); await save({ apis: l }); if (/^(api|tog):/.test(S.sel || '')) { S.sel = null; await save({ sel: null }); } Sound.tick(1200); S._lastTab = 'settings'; renderMain(); break; }
     case 'sKey': await save({ searchKey: $('#sKey').value.trim(), pexelsKey: ($('#pKey')?.value || '').trim() }); toast(T('saved')); break;
@@ -2172,6 +2187,7 @@ root.addEventListener('click', async e => {
     case 'jump': { S.follow = true; const box = $('#msgs'); if (box) { box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' }); S._auto = true; } showJump(); break; }
     case 'stop': S.streaming?.abort(); Object.values(S.pending).forEach(r => r(false)); S.pending = {}; break;
     case 'allow': case 'deny': { const r = S.pending[v]; delete S.pending[v]; r && r(b.dataset.act === 'allow'); break; }
+    case 'qPick': { const [qid, i] = String(v).split('|'); const msg = S.msgs[S.msgs.length - 1]; const opt = msg && msg.ask && (msg.ask.options || [])[+i]; const r = S.pending[qid]; delete S.pending[qid]; r && r(opt || ''); break; }
     case 'autoAgent': await save({ autoAgent: S.st.autoAgent === false }); Sound.tick(1500); S._lastTab = 'chat'; renderMain(); break;
     case 'kimiSave': {
       const key = $('#kKey').value.trim(); if (!key) return;
@@ -2245,6 +2261,15 @@ document.addEventListener('keydown', e => {
     const t = curTab(); if (t) t.wv.loadURL(u).catch(() => {}); else browse(u, true);
   }
 });
+root.addEventListener('submit', e => {
+  const f = e.target.closest && e.target.closest('[data-act=qOwn]');
+  if (!f) return;
+  e.preventDefault();
+  const qid = f.dataset.v, inp = document.getElementById('qi-' + qid);
+  const val = (inp && inp.value || '').trim();
+  if (!val) return;
+  const r = S.pending[qid]; delete S.pending[qid]; r && r(val);
+});
 root.addEventListener('change', async e => {
   const t = e.target;
   if (t.dataset.act === 'sel') { S.sel = t.value; save({ sel: t.value }); Sound.tick(1500); showVision(); renderMain(); }
@@ -2293,7 +2318,7 @@ function applyTheme() { document.documentElement.classList.toggle('light', S.st.
 (async () => {
   S.st = await P.getSettings(); applyTheme();
   P.version().then(v => { S.version = v; }).catch(() => {});
-  P.img.have().then(l => { S.imgHave = new Set(l); if (S.st.imgModel && l.includes(S.st.imgModel)) S.imgRunning = S.st.imgModel; }).catch(() => {});
+  P.img.have().then(l => { S.imgHave = new Set(l); }).catch(() => {});
   P.img.partials().then(o => { S.imgPartial = o; }).catch(() => {});
   if (S.st.apis) {
     // 1.x stored one entry per model; 2.0 stores one entry per key with all of its models

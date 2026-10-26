@@ -20,7 +20,7 @@ No account, no subscription — download a model and start building. Connect clo
 - **Runs AI locally.** Models run on your GPU or CPU with [llama.cpp](https://github.com/ggml-org/llama.cpp). Your chats and files never leave your computer.
 - **Picks the right model for your hardware.** PULSAR checks your GPU, RAM and CPU, recommends a model, and tunes compression, GPU layers and context automatically.
 - **Agents that actually do things.** They write files, run code, open websites and read them — inside a workspace folder you control.
-- **Several agents in one request.** Send a link and say "make a site like this" — one agent studies the example, coders build it (two at once if your GPU allows), PULSAR runs the result, and another agent fixes the errors it finds.
+- **Several agents in one request.** Send a link and say "make a site like this" — one agent studies the example, coders build it (two at once if your GPU allows), PULSAR runs the result.
 - **Asks before saving, and every overwrite can be undone.** Nothing is written to your PC without your OK, and the previous content of any file an agent overwrites is kept (last 10 versions) so a bad edit can be rolled back.
 - **Built-in browser** with tabs. Agents can click, type and scroll in it — and ask before opening every new website.
 - **Code editor and output panel** on the side: edit what the agents made, run Python / JavaScript (games with keyboard input work). Python is bundled, nothing to install.
@@ -52,9 +52,11 @@ No account, no subscription — download a model and start building. Connect clo
 | **PULSAR IN PC** | Reads and searches files anywhere on the computer; creates and organizes them inside the projects folder. Never deletes. |
 | **PULSAR IN BROWSER** | Searches the web, opens sites in the built-in browser, summarizes with links. |
 
+Agents ask with a card — the question, two to four options as buttons and a free-text field — and wait for the answer instead of writing the question into the chat.
+
 With **Auto** on, PULSAR picks the agent for every message and chains them when a task needs more than one:
 
-`Task received → Analysis → Plan → Processing → Check & fix → Saving`
+`Task received → Analysis → Plan → Processing → Saving`
 
 ## Image generation
 
@@ -125,7 +127,8 @@ In PULSAR open **Optimization → Report a problem**. It saves a report file (ve
 
 - Сам проверяет железо и советует модель, сам подбирает настройки.
 - Агенты пишут сайты и программы, сохраняют файлы, запускают код и открывают сайты во встроенном браузере.
-- Несколько агентов в одном запросе: один разбирает пример по ссылке, двое пишут код, PULSAR проверяет результат, ещё один агент исправляет ошибки.
+- Несколько агентов в одном запросе: один разбирает пример по ссылке, двое пишут код, PULSAR запускает результат.
+- Агенты задают уточняющие вопросы карточкой с вариантами, а не текстом в чате.
 - Перед сохранением на компьютер всегда спрашивает разрешение, а прошлую версию перезаписанного файла всегда можно вернуть.
 - **Режим дизайна:** сайты собираются из 25 готовых блоков в стиле shadcn/ui, 8 стилей (минимализм Apple, тёмный tech / неон, стекло, корпоративный, брутализм, терминал, журнал, градиенты), стили и анимации PULSAR добавляет сам. Можно выключить.
 - **Генерация фото:** модели для картинок лежат в «Моделях» — скачал, запустил, пишешь в чате «нарисуй кота». От лёгкой SD Turbo до Qwen Image 2.1, которая умеет надписи по-русски.

@@ -727,7 +727,19 @@ ipcMain.handle('api:check', async (_e, { key, url }) => {
   if (url) { const known = PROVIDERS.find(p => url.startsWith(p.url)); cands = [{ name: known ? known.name : (url.match(/\/\/([^/]+)/) || [])[1] || 'API', url, kind: /anthropic\.com/.test(url) ? 'anthropic' : undefined }]; }
   let guessing = false;
   if (!url) { const p = PROVIDERS.find(p => p.re.test(key)); guessing = !p; cands = p ? [p] : GUESS; }
-  let last = 'Не удалось определить, от какого сервиса этот ключ. Укажи адрес API вручную.', authErr = null;
+  // Some services refuse /models (403/404) but answer /chat/completions fine. Rather than
+  // calling such a key broken, try the model names that are actually common and see which
+  // one replies — and if none do, the UI asks for the address and model by hand.
+  const COMMON = ['gpt-4o-mini', 'gpt-4o', 'gpt-5', 'claude-sonnet-4-5', 'gemini-2.5-flash', 'deepseek-chat',
+    'llama-3.3-70b-versatile', 'qwen-plus', 'grok-3', 'mistral-large-latest'];
+  async function viaChat(p) {
+    for (const model of COMMON) {
+      const probe = await keyWorks(p, key, [{ id: model }]);
+      if (probe.ok) return { ok: true, provider: p.name, url: p.url, kind: p.kind || 'openai', models: [{ id: model }], guessedModel: true };
+    }
+    return null;
+  }
+  let last = 'Не удалось определить, от какого сервиса этот ключ. Укажи адрес API вручную.', authErr = null, listBlocked = false;
   for (const p of cands) {
     try {
       const models = await listModels(p, key);
@@ -743,10 +755,17 @@ ipcMain.handle('api:check', async (_e, { key, url }) => {
       return { ok: true, provider: p.name, url: p.url, kind: p.kind || 'openai', models };
     } catch (e) {
       if (e.name === 'TimeoutError' || /fetch failed|ENOTFOUND|ECONN/i.test(String(e.message) + String(e.cause))) { last = cands.length === 1 ? 'Нет связи с сервером API — проверь интернет или адрес' : last; continue; }
-      if (cands.length === 1 || e.status !== 401) authErr = authErr || e.message; 
+      // the listing is closed, but the key itself may be perfectly good
+      if (e.status === 403 || e.status === 404 || e.status === 405) {
+        listBlocked = true;
+        const byChat = await viaChat(p);
+        if (byChat) return byChat;
+      }
+      if (cands.length === 1 || e.status !== 401) authErr = authErr || e.message;
     }
   }
-  return { ok: false, error: authErr || last };
+  // nothing worked automatically: tell the UI to ask for the address and the model by hand
+  return { ok: false, error: authErr || last, needManual: listBlocked || !url };
 });
 // a tiny real request, so "connected" means the model really answers
 ipcMain.handle('api:ping', async (_e, a) => {

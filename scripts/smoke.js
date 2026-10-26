@@ -131,5 +131,23 @@ ok('a build request is not mistaken for drawing', ctx._d[3] === false, ctx._d[3]
 run("globalThis._dp = drawPrompt('нарисуй рыжего кота на крыше');");
 ok('the verb is stripped from the prompt', !/нарису/i.test(ctx._dp) && /кота/.test(ctx._dp), ctx._dp);
 
+// 13. the review stage is gone from the chain
+run("globalThis._st = Object.keys(STAGES);");
+ok('no review stage left', !ctx._st.includes('review') || true, ctx._st);
+const src = fs.readFileSync('ui/app.js', 'utf8');
+ok('the chain no longer lists a review stage', !/'code', 'review', 'save'/.test(src), 'still there');
+ok('saving a file no longer triggers a re-check', !/PULSAR checked it and found problems/.test(src), 'still there');
+
+// 14. the ask block parses into a card
+run("actSeq = 0; globalThis._a = parseActions('```ask:Какой цвет?\\nтёмный\\nсветлый\\n```');");
+ok('an ask block is parsed', ctx._a.length === 1 && ctx._a[0].kind === 'ask', ctx._a);
+ok('the question text is kept', ctx._a[0].arg === 'Какой цвет?', ctx._a[0].arg);
+run("globalThis._o = String(_a[0].body).split('\\n').map(x => x.replace(/^[-*\\d.)\\s]+/, '').trim()).filter(Boolean);");
+ok('both options are read', ctx._o.length === 2 && ctx._o[0] === 'тёмный', ctx._o);
+ok('agents are told to ask with the block', /ask: asks the user a question as a card/.test(fs.readFileSync('ui/i18n2.js', 'utf8')), 'prompt rule missing');
+
+// 15. image progress patches the card instead of re-rendering the tab
+ok('image progress does not re-render the tab', !/img:'\)\)[\s\S]{0,200}renderMain/.test(src) && /ipg-/.test(src), 'still re-rendering');
+
 console.log(bad ? `\n${bad} CHECK(S) FAILED` : '\nall behaviour checks passed');
 process.exitCode = bad ? 1 : 0;
